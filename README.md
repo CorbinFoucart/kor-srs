@@ -19,6 +19,11 @@ Hanja, and multi-word reading passages) is generated on demand by an LLM.
 
 ## Features
 
+Anki is great, but building cards that put each vocabulary word in a natural
+sentence, with a translation and a Hanja breakdown, is slow to do by hand.
+Korean SRS generates that context for you and schedules it, with card creation
+built specifically for Korean.
+
 <p align="center">
   <img src="docs/img/screen-start.png"   width="30%" alt="Start screen" />
   &nbsp;&nbsp;
