@@ -1,0 +1,27 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+
+      - name: import smoke test
+        env:
+          OPENAI_API_KEY: dummy   # value unused; import-time OpenAI() needs it set
+        run: |
+          python -c "import web_server, review_cli, lexeme_srs, incremental_model, \
+            acquisition_model, srs_db, hanja, hanja_validate, passage_review, grammar_srs"
+
+      - name: secret and PII scan
+        run: |
+          if grep -rInE 'sk-[A-Za-z0-9]{20,}|100\.108\.79\.114|/Users/[A-Za-z]' \
+              --include='*.py' --include='*.md' --include='*.yaml' --include='*.html' .; then
+            echo "secret or PII pattern found"; exit 1
+          fi

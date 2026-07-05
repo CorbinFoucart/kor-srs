@@ -1,0 +1,3022 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Korean SRS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* "Ink" theme — OKLCH single-hue surfaces (264), semantic recolor:
+     correct → blue, wrong/repair → orange (no red), gate → grey,
+     green reserved for accuracy/success. Synced from Claude Design. */
+  :root {
+    /* surfaces — one hue, climbing in lightness */
+    --bg:        oklch(0.185 0.024 264);
+    --surface:   oklch(0.245 0.030 264);
+    --surface-2: oklch(0.262 0.032 263);  /* focal panels (start screen)   */
+    --card-bg:   oklch(0.285 0.034 262);
+    --border:    oklch(0.345 0.030 262);
+    --border-soft: oklch(0.300 0.028 263); /* quieter hairlines            */
+    /* text */
+    --text:     oklch(0.945 0.012 264);
+    --text-mid: oklch(0.780 0.018 264);    /* between text and text-dim     */
+    --text-dim: oklch(0.660 0.022 264);
+    /* brand / actions */
+    --accent:    oklch(0.640 0.150 258);
+    --blue:      oklch(0.680 0.130 250);   /* "acquired" stat               */
+    --highlight: oklch(0.740 0.140 248);
+    /* semantic — harmonized, no red */
+    --correct:    oklch(0.620 0.150 253);
+    --orange:     oklch(0.815 0.118 72);
+    --orange-ink: oklch(0.300 0.055 62);
+    --gate:       oklch(0.760 0.012 264);
+    --gate-ink:   oklch(0.270 0.018 264);
+    --noidea:     oklch(0.495 0.022 264);
+    --green:      oklch(0.745 0.120 158);
+    /* back-compat: legacy --red references map to orange (Ink uses no red) */
+    --red: var(--orange);
+    /* type */
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top, 0px) 16px var(--safe-bottom) 16px;
+  }
+
+  /* ── status bar ──────────────────────────────── */
+  #status-bar {
+    flex-shrink: 0;
+    padding: 12px 0 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  #status-bar.hidden { display: none; }
+
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+    white-space: nowrap;
+  }
+
+  .progress-bar-container {
+    flex: 1;
+    height: 7px;
+    background: var(--border);
+    border-radius: 4px;
+    margin: 0 12px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+
+  .accuracy { color: var(--green); font-weight: 500; }
+
+  /* ── card area ───────────────────────────────── */
+  #card-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Center the content as one group when it fits; top-align + scroll when
+       it overflows (`safe` avoids the iOS top-clipping bug). Replaces the old
+       per-child `margin:auto`, which spread multi-element cards apart. */
+    justify-content: safe center;
+    padding: 24px 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #card-area::-webkit-scrollbar { display: none; }
+
+  .card-label {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 999px;
+    letter-spacing: 0.2px;
+    margin-bottom: 16px;
+  }
+
+  .label-intro { background: var(--accent); color: #fff; }
+  .label-review { background: var(--border); color: var(--text); }
+  .label-gate { background: var(--gate); color: var(--gate-ink); }
+  .label-repair { background: var(--orange); color: var(--orange-ink); }
+
+  .card-front {
+    font-size: 22px;
+    line-height: 1.6;
+    text-align: center;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    padding: 0 8px;
+  }
+
+  .card-divider {
+    width: 72%;
+    height: 1px;
+    background: var(--border);
+    margin: 22px auto;
+  }
+
+  .card-back {
+    font-size: 22px;
+    line-height: 1.6;
+    text-align: center;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    padding: 0 8px;
+  }
+
+  .card-front .highlight { color: var(--highlight); font-weight: 500; }
+
+  .card-front .clickword {
+    cursor: pointer;
+    border-bottom: 1px dotted transparent;
+    transition: border-color 0.15s;
+  }
+  .card-front .clickword:hover { border-bottom-color: var(--text-dim); }
+  .card-front .clickword.cw-added {
+    color: var(--text-dim);
+    border-bottom-color: transparent;
+    cursor: default;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: oklch(0.12 0.02 264 / 0.66);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 200;
+    backdrop-filter: blur(2px);
+  }
+  .modal-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+    width: 100%;
+    max-width: 420px;
+    max-height: 82vh;
+    overflow-y: auto;
+  }
+
+  .passage-output {
+    font-size: 19px;
+    line-height: 1.75;
+    word-break: keep-all;
+  }
+  .passage-paragraph {
+    margin: 0 0 12px 0;
+  }
+  .passage-output .clickword {
+    cursor: pointer;
+    border-bottom: 1px dotted transparent;
+  }
+  .passage-output .clickword:hover { border-bottom-color: var(--text-dim); }
+  .passage-output .clickword.cw-added {
+    color: var(--text-dim);
+    border-bottom-color: transparent;
+    cursor: default;
+  }
+  .passage-output .clickword.cw-tapped {
+    background: oklch(0.815 0.118 72 / 0.30);
+    color: var(--text);
+    border-radius: 3px;
+    padding: 0 3px;
+    border-bottom-color: transparent;
+  }
+
+  .card-hint {
+    font-size: 16px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    text-align: center;
+  }
+
+  .card-translation {
+    font-size: 18px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* dictionary entry — base word (lemma, blue) inline beside its definition */
+  .card-entry {
+    font-size: 21px;
+    line-height: 1.5;
+    text-align: center;
+    padding: 0 8px;
+  }
+  .card-entry .lemma { color: var(--highlight); font-weight: 500; }
+  .card-entry .sep { color: var(--text-dim); margin: 0 6px; }
+
+  /* ── sense picker (multi-sense add) ───────────────── */
+  .picker-sub { font-size: 13px; color: var(--text-dim); text-align: center; margin-bottom: 14px; }
+  .sense-list { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 4px; }
+  .sense-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .sense-row-exists { opacity: 0.55; cursor: default; }
+  .sense-row .sense-cb { margin-top: 3px; width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+  .sense-text { font-size: 15px; line-height: 1.4; }
+  .sense-hanja { color: var(--text-dim); font-size: 16px; margin-right: 8px; letter-spacing: 1px; }
+  .sense-def { color: var(--text); }
+  .sense-exists { color: var(--text-dim); font-size: 12px; margin-left: 6px; }
+
+  /* ── hanja breakdown (recog cards only) ───────── */
+  .card-hanja {
+    margin: 20px auto 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    max-width: 320px;
+  }
+  .card-hanja .hanja-word {
+    font-size: 21px;
+    text-align: center;
+    letter-spacing: 3px;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .card-hanja .hanja-gloss {
+    font-size: 14px;
+    font-style: italic;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 12px;
+  }
+  .card-hanja table {
+    border-collapse: collapse;
+    margin: 0 auto;
+  }
+  .card-hanja td {
+    padding: 3px 12px;
+    font-size: 16px;
+    vertical-align: middle;
+  }
+  .card-hanja .hc-char { font-size: 18px; color: var(--text); text-align: center; }
+  .card-hanja .hc-read { color: var(--text-dim); text-align: center; }
+  .card-hanja .hc-mean { color: var(--text); text-align: left; }
+  /* representative words sharing the char — grounding, kept quiet.
+     nowrap keeps each cell on one line (no per-syllable wrap); keep-all is a
+     fallback so any forced wrap breaks between words, never mid-word. */
+  .card-hanja .hc-ex { color: var(--text-dim); text-align: left; font-size: 13px; padding-left: 12px; white-space: nowrap; word-break: keep-all; }
+
+  .card-hanja-actions { text-align: center; margin-top: 16px; }
+  .hanja-btn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 14px;
+    cursor: pointer;
+    min-height: 0;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .hanja-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text-dim); }
+  .hanja-btn:disabled { opacity: 0.6; cursor: default; }
+  .card-hanja-none {
+    text-align: center;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ── waiting / complete ──────────────────────── */
+  .waiting-text {
+    font-size: 48px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    font-family: var(--mono);
+  }
+
+  .waiting-label {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 8px;
+  }
+
+  .complete-text {
+    font-size: 18px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  /* ── action bar ──────────────────────────────── */
+  #action-bar {
+    flex-shrink: 0;
+    padding: 12px 0 12px;
+    padding-bottom: calc(12px + var(--safe-bottom));
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .btn-row:last-child { margin-bottom: 0; }
+
+  button {
+    flex: 1;
+    min-height: 56px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s, filter 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:hover { filter: brightness(1.06); }
+
+  button:active {
+    opacity: 0.8;
+    transform: scale(0.97);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-correct {
+    background: var(--correct);
+    color: #fff;
+  }
+
+  .btn-wrong {
+    background: var(--orange);
+    color: var(--orange-ink);
+  }
+
+  .btn-noidea {
+    background: var(--noidea);
+    color: var(--text);
+  }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .grade-label {
+    display: block;
+    font-size: 11px;
+    opacity: 0.85;
+    margin-top: 2px;
+    font-weight: 400;
+  }
+
+  /* ── retype prompt ──────────────────────────────── */
+  .retype-prompt {
+    font-size: 14px;
+    color: var(--text-dim);
+    margin-top: 16px;
+    text-align: center;
+  }
+
+  .retype-input {
+    width: 80%;
+    max-width: 400px;
+    margin: 12px auto 0;
+    padding: 10px 14px;
+    font-size: 22px;
+    font-family: 'Noto Sans KR', sans-serif;
+    text-align: center;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    display: block;
+  }
+
+  .retype-input:focus {
+    border-color: var(--accent);
+  }
+
+  /* ── loading ─────────────────────────────────── */
+  .loading {
+    color: var(--text-dim);
+    font-size: 16px;
+  }
+
+  /* ── start screen ──────────────────────────────── */
+  .start-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 32px;
+  }
+
+  .stats-table {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .stats-inline {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 8px 0;
+    font-size: 14px;
+  }
+
+  .param-controls {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 14px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 430px) {
+    .stats-inline {
+      gap: 8px;
+      font-size: 12px;
+    }
+    .param-controls {
+      gap: 10px;
+      font-size: 13px;
+    }
+  }
+
+  .stats-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 16px;
+  }
+
+  .stats-label { color: var(--text-dim); }
+  .stats-value { font-weight: 500; }
+
+  /* ── start screen (redesign, synced from Claude Design) ──────────
+     all selectors scoped under .start-app to avoid collisions. */
+  .start-app { width: 100%; max-width: 440px; margin: 0 auto; display: block; text-align: left; }
+  .start-app .title { text-align: center; margin-bottom: 26px; }
+  .start-app .title h1 { font-size: 25px; font-weight: 700; letter-spacing: -0.3px; }
+  .start-app .title .ko { font-family: var(--mono); font-size: 11px; letter-spacing: 3px; color: var(--text-dim); text-transform: uppercase; margin-top: 7px; }
+  .start-app .section { margin-bottom: 6px; }
+  .start-app .section-head { font-size: 11px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; color: var(--text-dim); margin: 18px 0 10px; }
+  .start-app .row { display: flex; align-items: baseline; justify-content: space-between; padding: 7px 2px; gap: 12px; }
+  .start-app .row + .row { border-top: 1px solid var(--border-soft); }
+  .start-app .row .k { font-size: 15px; color: var(--text-mid); }
+  .start-app .row .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.2px; }
+  .start-app .row .v.muted { color: var(--text-mid); font-weight: 600; }
+  .start-app .v.green { color: var(--green); }
+  .start-app .v.orange { color: var(--orange); }
+  .start-app .band { display: flex; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 11px; margin-top: 12px; overflow: hidden; }
+  .start-app .band.focal { background: var(--surface-2); border-color: var(--border); }
+  .start-app .band .cell { flex: 1; text-align: center; padding: 12px 6px; }
+  .start-app .band .cell + .cell { border-left: 1px solid var(--border-soft); }
+  .start-app .band .cell .n { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .start-app .band .cell .l { font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+  .start-app .n.blue { color: var(--blue); }
+  .start-app .n.green { color: var(--green); }
+  .start-app .n.orange { color: var(--orange); }
+  .start-app .controls { display: flex; align-items: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .start-app .pill-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 9px; padding: 9px 15px; font-size: 14px; font-family: inherit; font-weight: 500; cursor: pointer; min-height: 0; flex: 0 0 auto; }
+  .start-app .pill-btn:hover { border-color: var(--text-dim); }
+  .start-app .field { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 9px 6px; min-width: 52px; width: 56px; text-align: center; font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--text); }
+  .start-app .stepper { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .start-app .stepper .lbl { font-size: 14px; color: var(--text-dim); }
+  .start-app .step-btn { width: 38px; height: 38px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 19px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; min-height: 0; }
+  .start-app .step-btn:hover { border-color: var(--text-dim); }
+  .start-app .step-val { font-family: var(--mono); font-size: 15px; font-weight: 600; min-width: 22px; text-align: center; }
+  .start-app .rule { height: 1px; background: var(--border-soft); margin: 20px 0 2px; border: none; }
+  .start-app .collapse-head { display: flex; align-items: center; justify-content: space-between; width: 100%; background: transparent; border: none; color: var(--text); font-family: inherit; cursor: pointer; padding: 16px 2px 12px; gap: 12px; min-height: 0; }
+  .start-app .collapse-head .ch-left { display: flex; align-items: baseline; gap: 12px; }
+  .start-app .collapse-head .ch-title { font-size: 11px; font-weight: 600; letter-spacing: 1.6px; text-transform: uppercase; color: var(--text-dim); }
+  .start-app .collapse-head .ch-sum { font-size: 13px; color: var(--text-mid); font-variant-numeric: tabular-nums; }
+  .start-app .collapse-head .ch-sum b { color: var(--text); font-weight: 700; }
+  .start-app .collapse-head .ch-sum .due { color: var(--orange); font-weight: 700; }
+  .start-app .chev { transition: transform .25s ease; color: var(--text-dim); flex: none; }
+  .start-app .collapse-head[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .start-app .collapse-body { display: none; }
+  .start-app .collapse-body.open { display: block; }
+  .start-app .primary { display: flex; gap: 11px; margin-top: 26px; }
+  .start-app .primary button { flex: 1; min-height: 58px; border: none; border-radius: 13px; font-size: 16px; font-weight: 600; font-family: inherit; cursor: pointer; transition: filter .15s, transform .1s; }
+  .start-app .primary button:hover { filter: brightness(1.07); }
+  .start-app .primary button:active { transform: scale(0.985); }
+  .start-app .primary .resume { background: var(--accent); color: #fff; }
+  .start-app .primary .alt { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .start-app .primary button .sub { display: block; font-size: 11px; font-weight: 500; opacity: .8; margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .start-app .more-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; padding-top: 12px; }
+  .start-app .more-grid button { background: var(--surface); border: 1px solid var(--border-soft); color: var(--text-mid); border-radius: 10px; padding: 13px 8px; font-size: 13.5px; font-family: inherit; font-weight: 500; cursor: pointer; min-height: 0; }
+  .start-app .more-grid button:hover { border-color: var(--text-dim); color: var(--text); }
+  .start-app .more-grid button.span2 { grid-column: span 2; }
+  .start-app .foot-toggle { display: flex; justify-content: center; margin-top: 14px; }
+  .start-app .foot-toggle button { display: flex; align-items: center; gap: 8px; background: transparent; border: none; color: var(--text-dim); font-size: 13px; font-family: inherit; cursor: pointer; padding: 8px 14px; border-radius: 8px; min-height: 0; }
+  .start-app .foot-toggle button:hover { color: var(--text); background: var(--surface); }
+  .start-app .foot-toggle .chev { width: 14px; height: 14px; }
+  .start-app .foot-toggle button[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+  /* ── definition confirm screen ─────────────────── */
+  .def-term {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+
+  .def-section {
+    width: 100%;
+    max-width: 400px;
+    text-align: left;
+    margin-bottom: 8px;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .def-section-label {
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .def-examples {
+    list-style: none;
+    padding: 0;
+  }
+
+  .def-examples li {
+    padding: 2px 0;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .error-text {
+    color: var(--red);
+    font-size: 15px;
+    margin-bottom: 8px;
+  }
+
+  .success-text {
+    color: var(--green);
+    font-size: 15px;
+    margin-bottom: 8px;
+  }
+
+  /* ── grammar mode ─────────────────────────────── */
+  .grammar-question {
+    font-size: 20px;
+    line-height: 1.6;
+    text-align: center;
+    white-space: pre-wrap;
+    word-break: keep-all;
+    padding: 0 8px;
+  }
+
+  .grammar-input {
+    width: 100%;
+    max-width: 400px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 18px;
+    outline: none;
+    margin-top: 16px;
+  }
+
+  .grammar-input:focus {
+    border-color: var(--accent);
+  }
+
+  .grammar-feedback-correct {
+    color: var(--green);
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  .grammar-feedback-wrong {
+    color: var(--red);
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  .grammar-feedback-detail {
+    font-size: 15px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    text-align: center;
+    line-height: 1.6;
+  }
+
+  .grammar-user-answer {
+    font-size: 16px;
+    color: var(--text-dim);
+    margin-top: 12px;
+    text-align: center;
+  }
+
+  .mode-btn {
+    min-height: 64px;
+    font-size: 18px;
+  }
+
+  #toast-container {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  .toast {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    text-align: center;
+    pointer-events: auto;
+    animation: toast-in 0.3s ease;
+    max-width: 90vw;
+  }
+
+  .toast-success {
+    background: var(--green);
+    color: #000;
+  }
+
+  .toast-error {
+    background: var(--red);
+    color: #fff;
+  }
+
+  .toast-pending {
+    background: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── intro queue manager ─────────────────────────────────── */
+  .intro-mgr { align-self: stretch; display: flex; flex-direction: column; gap: 10px; }
+  .intro-mgr .im-title { font-size: 18px; font-weight: 500; text-align: center; }
+  .intro-mgr .im-sub { font-size: 12px; color: var(--text-dim); line-height: 1.45; text-align: center; }
+  .intro-mgr .im-tools { display: flex; gap: 8px; align-items: center; }
+  .intro-mgr .im-search {
+    flex: 1; padding: 8px 10px; font-size: 14px; background: var(--card-bg);
+    color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-family: inherit;
+  }
+  .intro-mgr .im-meta { font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+  .intro-mgr .im-meta .dirty { color: var(--orange); }
+  .intro-mgr .im-meta-row { display: flex; justify-content: flex-end; }
+  .intro-mgr .im-spread { min-height: 0; padding: 8px 12px; font-size: 13px; white-space: nowrap; flex: 0 0 auto; }
+  .im-list {
+    display: flex; flex-direction: column; gap: 4px; max-height: 58vh; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px; background: var(--bg);
+  }
+  .im-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px;
+    background: var(--card-bg); border: 1px solid transparent;
+  }
+  .im-row.session { border-color: var(--accent); }
+  .im-row.dragging { opacity: 0.35; }
+  .im-row.drop-above { box-shadow: inset 0 2px 0 var(--accent); }
+  .im-row .im-handle { cursor: grab; color: var(--text-dim); font-size: 13px; user-select: none; touch-action: none; }
+  .im-row .im-rank { width: 34px; font-size: 12px; color: var(--text-dim); text-align: right; font-family: var(--mono); flex: 0 0 auto; }
+  .im-row .im-word { font-size: 16px; color: var(--text); flex: 0 0 auto; }
+  .im-row .im-sense { font-size: 12px; color: var(--text-dim); flex: 0 0 auto; }
+  .im-row .im-gloss { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text-dim);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .im-row .im-btns { display: flex; gap: 3px; flex: 0 0 auto; }
+  .im-row .im-btns button {
+    min-height: 0; padding: 3px 8px; font-size: 13px; border-radius: 5px; line-height: 1;
+    background: var(--surface); color: var(--text-dim); border: 1px solid var(--border);
+  }
+  .im-row .im-btns button:hover { color: var(--text); border-color: var(--text-dim); }
+  .im-divider { font-size: 11px; color: var(--accent); text-align: center; padding: 4px 0 2px;
+    letter-spacing: 0.5px; border-top: 1px dashed var(--border); margin-top: 2px; }
+  .im-empty { text-align: center; color: var(--text-dim); font-size: 13px; padding: 16px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="status-bar" class="hidden">
+    <div class="status-row">
+      <span id="st-due">Due: --</span>
+      <span id="st-accuracy" class="accuracy"></span>
+      <span id="st-learning">Learning: -/-</span>
+    </div>
+    <div class="status-row">
+      <span id="st-target-label">Target:</span>
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="st-progress" style="width:0%"></div>
+      </div>
+      <span id="st-target-nums">0/0</span>
+    </div>
+    <div id="st-review-log" style="font-size:11px;color:var(--text-dim);margin-top:4px;min-height:14px;font-family:var(--mono);opacity:0.85;"></div>
+  </div>
+
+  <div id="card-area">
+    <span class="loading">Loading...</span>
+  </div>
+
+  <div id="action-bar"></div>
+  <div id="toast-container"></div>
+
+  <div id="clickadd-modal" class="modal-overlay" style="display:none;"
+       onclick="if(event.target===this)W.closeClickAdd()">
+    <div class="modal-box" id="clickadd-body"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  // ── state ───────────────────────────────────────────────
+  // States: start_screen, defining, confirm_def, generating, loading,
+  //         intro, front, back, waiting, complete
+  let state = "loading";
+  let card = null;       // current card data
+  let counts = null;     // latest SessionCounts
+  let waitTimer = null;  // countdown interval ID
+  let waitSeconds = 0;
+
+  // add-word flow state
+  let pendingWord = "";
+  let pendingParsed = null;
+  let pendingDefBlock = "";
+
+  // grammar mode state
+  let grammarMode = false;
+  let grammarQuestion = "";
+  let grammarEval = null;
+  let grammarCounts = null;
+  let grammarWaitTimer = null;
+  let grammarWaitSeconds = 0;
+
+  // session params
+  let targetNew = 5;
+  let queueSize = 3;
+
+  // diff pair flow state
+  let pendingDiffA = "";
+  let pendingDiffB = "";
+  let pendingDiffParsedA = null;
+  let pendingDiffParsedB = null;
+  let pendingDiffDefBlockA = "";
+  let pendingDiffDefBlockB = "";
+
+  // grammar add-pattern flow
+  let pendingPattern = "";
+  let pendingPatternParsed = null;
+
+  const $card = document.getElementById("card-area");
+  const $actions = document.getElementById("action-bar");
+  const $statusBar = document.getElementById("status-bar");
+
+  // ── API helpers ─────────────────────────────────────────
+  async function api(method, path, body) {
+    const opts = { method, headers: {} };
+    if (body !== undefined) {
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(path, opts);
+    return res.json();
+  }
+
+  // ── status bar ──────────────────────────────────────────
+  function showStatusBar(show) {
+    if (show) {
+      $statusBar.classList.remove("hidden");
+    } else {
+      $statusBar.classList.add("hidden");
+    }
+  }
+
+  function updateStatus(c) {
+    if (!c) return;
+    counts = c;
+    // Phase breakdown: M 15 | A 36 | R 1 (letters grey, numbers white)
+    const dim = "color:var(--text-dim)";
+    const bright = "color:var(--text)";
+    const parts = [];
+    const m = c.due_maintenance || 0;
+    const a = c.due_acquiring || 0;
+    const r = c.due_repair || 0;
+    if (m > 0) parts.push(`<span style="${dim}">M</span> <span style="${bright}">${m}</span>`);
+    if (a > 0) parts.push(`<span style="${dim}">A</span> <span style="${bright}">${a}</span>`);
+    if (r > 0) parts.push(`<span style="${dim}">R</span> <span style="${bright}">${r}</span>`);
+    let dueLabel = parts.length > 0 ? parts.join(` <span style="${dim}">|</span> `) : `<span style="${dim}">Due: 0</span>`;
+    if (c.reviews_locked > 0) dueLabel += ` <span style="${dim}">(+${c.reviews_locked})</span>`;
+    document.getElementById("st-due").innerHTML = dueLabel;
+    document.getElementById("st-learning").textContent = `Learning: ${c.learning}/${c.learning_capacity}`;
+
+    const acc = c.total_graded > 0 ? Math.round(c.correct_count / c.total_graded * 100) : null;
+    const $acc = document.getElementById("st-accuracy");
+    $acc.textContent = acc !== null ? `${acc}%` : "";
+
+    document.getElementById("st-target-nums").textContent = `${c.target_done}/${c.target_total}`;
+    const pct = c.target_total > 0 ? (c.target_done / c.target_total * 100) : 0;
+    document.getElementById("st-progress").style.width = pct + "%";
+  }
+
+  function updateRepairMode(data) {
+    const el = document.getElementById("st-review-log");
+    if (!el) return;
+    if (data.in_repair_mode) {
+      const n = data.repair_remaining || 0;
+      el.textContent = `Repair mode · ${n} word${n !== 1 ? "s" : ""} remaining`;
+      el.style.color = "var(--red)";
+    } else {
+      el.style.color = "var(--text-dim)";
+    }
+  }
+
+  // ── countdown formatting ────────────────────────────────
+  function fmtCountdown(secs) {
+    const total = Math.max(0, Math.ceil(secs));
+    const d = Math.floor(total / 86400);
+    const h = Math.floor((total % 86400) / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    if (d > 0) return d + "d " + h + "h";
+    if (h > 0) return h + "h " + m + "m";
+    const s = total % 60;
+    return m + ":" + String(s).padStart(2, "0");
+  }
+
+  // ── start screen ──────────────────────────────────────────
+  // Wire collapsibles (Grammar section, More actions) — each toggle carries
+  // data-collapse="<body-id>"; aria-expanded drives the chevron + body.
+  function setupStartCollapse() {
+    document.querySelectorAll(".start-app [data-collapse]").forEach(function(head) {
+      head.addEventListener("click", function() {
+        const body = document.getElementById(head.getAttribute("data-collapse"));
+        const open = head.getAttribute("aria-expanded") === "true";
+        head.setAttribute("aria-expanded", String(!open));
+        if (body) body.classList.toggle("open", !open);
+        const lbl = head.querySelector(".mt-label");
+        if (lbl) lbl.textContent = open ? "More actions" : "Hide actions";
+      });
+    });
+  }
+
+  async function renderStartScreen() {
+    state = "start_screen";
+    showStatusBar(false);
+    clearInterval(waitTimer);
+
+    $card.innerHTML = `
+      <div class="spinner"></div>
+      <span class="loading">Loading stats...</span>
+    `;
+    $actions.innerHTML = "";
+
+    try {
+      const [data, dailyData] = await Promise.all([
+        api("GET", "/api/pre-session-status"),
+        api("GET", "/api/daily-analysis").catch(function() { return null; }),
+      ]);
+
+      targetNew = data.target_new;
+      queueSize = data.queue_size;
+      const acc = (dailyData && dailyData.reviews > 0) ? Math.round(dailyData.accuracy * 100) : null;
+
+      const chev = `<svg class="chev" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>`;
+      const dots = `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
+
+      // ── Today controls (params) ──
+      let controlsHtml;
+      if (data.in_session) {
+        controlsHtml = `
+          <div class="controls">
+            <button class="pill-btn" onclick="W.addNewWords()">Add Words</button>
+            <input id="add-words-count" class="field" type="number" value="5" min="1" max="25">
+            <span id="add-words-feedback" style="color:var(--green);font-size:13px;"></span>
+            <div class="stepper"><span class="lbl">Queue</span>
+              <button class="step-btn" onclick="W.adjustParam('queue_size',-1)">&minus;</button>
+              <span class="step-val" id="param-queue-size">${queueSize}</span>
+              <button class="step-btn" onclick="W.adjustParam('queue_size',1)">+</button></div>
+          </div>`;
+      } else {
+        controlsHtml = `
+          <div class="controls">
+            <div class="stepper" style="margin-left:0;"><span class="lbl">New words</span>
+              <button class="step-btn" onclick="W.adjustParam('target_new',-1)">&minus;</button>
+              <span class="step-val" id="param-target-new">${targetNew}</span>
+              <button class="step-btn" onclick="W.adjustParam('target_new',1)">+</button></div>
+            <div class="stepper"><span class="lbl">Queue</span>
+              <button class="step-btn" onclick="W.adjustParam('queue_size',-1)">&minus;</button>
+              <span class="step-val" id="param-queue-size">${queueSize}</span>
+              <button class="step-btn" onclick="W.adjustParam('queue_size',1)">+</button></div>
+          </div>`;
+      }
+
+      // ── Today (stats band) ──
+      let todayRows = "";
+      if (dailyData && dailyData.reviews > 0) {
+        todayRows = `
+          <div class="section">
+            <div class="row"><span class="k">Reviews</span><span class="v">${dailyData.reviews}</span></div>
+            <div class="row"><span class="k">Words studied</span><span class="v">${dailyData.words_studied}</span></div>
+            <div class="row"><span class="k">Accuracy</span><span class="v green">${acc}%</span></div>
+          </div>
+          <div class="band">
+            <div class="cell"><div class="n blue">${dailyData.acquired_today || 0}</div><div class="l">Acquired</div></div>
+            <div class="cell"><div class="n green">${dailyData.strengthened || 0}</div><div class="l">Strengthened</div></div>
+            <div class="cell"><div class="n orange">${dailyData.weakened || 0}</div><div class="l">Regressed</div></div>
+          </div>`;
+      }
+
+      // ── Tomorrow forecast ──
+      let forecastHtml = "";
+      if (dailyData) {
+        forecastHtml = `
+          <hr class="rule">
+          <div class="section-head">Tomorrow forecast</div>
+          <div class="band">
+            <div class="cell"><div class="n">${dailyData.tomorrow_due}</div><div class="l">Due</div></div>
+            <div class="cell"><div class="n">${dailyData.tomorrow_estimated_time}</div><div class="l">Est. time</div></div>
+          </div>`;
+      }
+
+      // ── Grammar (collapsible) ──
+      let grammarData = null;
+      try { grammarData = await api("GET", "/api/grammar/pre-session-status"); } catch (e) {}
+      let grammarHtml = "";
+      if (grammarData) {
+        const gActive = grammarData.total_patterns, gUnseen = grammarData.suspended_patterns, gDue = grammarData.due_now;
+        const gTotal = gActive + gUnseen;
+        const activate = gUnseen > 0 ? `
+            <div class="controls">
+              <button class="pill-btn" onclick="W.activateGrammar()">Activate</button>
+              <input id="grammar-activate-count" class="field" type="number" value="0" min="0" max="${gUnseen}">
+              <span id="grammar-activate-feedback" style="color:var(--green);font-size:13px;"></span>
+            </div>` : "";
+        grammarHtml = `
+          <hr class="rule">
+          <button class="collapse-head" aria-expanded="false" data-collapse="grammar-body">
+            <span class="ch-left"><span class="ch-title">Grammar</span>
+              <span class="ch-sum"><b>${gTotal}</b> patterns${gDue > 0 ? ` &middot; <span class="due">${gDue} due</span>` : ""}</span></span>
+            ${chev}
+          </button>
+          <div class="collapse-body" id="grammar-body"><div style="padding-top:2px;">
+            <div class="section">
+              <div class="row"><span class="k">Grammar patterns</span><span class="v">${gTotal}</span></div>
+              <div class="row"><span class="k">Unseen patterns</span><span class="v muted">${gUnseen}</span></div>
+              <div class="row"><span class="k">Grammar due</span><span class="v orange">${gDue}</span></div>
+            </div>
+            ${activate}
+          </div></div>`;
+      }
+
+      const dueNote = (data.due_now === 0 && data.next_due_seconds != null)
+        ? `<div style="text-align:center;font-size:12px;color:var(--text-dim);margin-top:8px;">next due in ${fmtCountdown(data.next_due_seconds)}</div>` : "";
+      const vocabLabel = data.in_session ? "Resume Vocab" : "Vocab Review";
+      const vocabAction = data.in_session ? "W.resumeSession()" : "W.startSession()";
+
+      $card.innerHTML = `
+        <div class="start-app">
+          <div class="title"><h1>Korean SRS</h1><div class="ko">한국어</div></div>
+
+          <div class="section">
+            <div class="row"><span class="k">Total words</span><span class="v">${data.total}</span></div>
+            <div class="row"><span class="k">Unseen</span><span class="v muted">${data.unseen}</span></div>
+            <div class="row"><span class="k">Acquiring</span><span class="v">${data.acquiring || 0}</span></div>
+            <div class="row"><span class="k">Maintenance</span><span class="v">${data.maintenance || 0}</span></div>
+          </div>
+          <div class="band focal">
+            <div class="cell"><div class="n orange">${data.due_now}</div><div class="l">Due now</div></div>
+            <div class="cell"><div class="n">${data.due_tomorrow}</div><div class="l">+24h</div></div>
+            <div class="cell"><div class="n">${data.due_day_after}</div><div class="l">+48h</div></div>
+          </div>
+          ${dueNote}
+
+          <hr class="rule">
+          <div class="section-head">Today</div>
+          ${todayRows}
+          ${controlsHtml}
+
+          ${forecastHtml}
+          ${grammarHtml}
+
+          <div class="primary">
+            <button class="resume" onclick="${vocabAction}">${vocabLabel}<span class="sub">${data.due_now} due</span></button>
+            <button class="alt" onclick="W.addWord()">Add Word</button>
+          </div>
+
+          <div class="foot-toggle">
+            <button aria-expanded="false" data-collapse="more-body">
+              ${dots}<span class="mt-label">More actions</span>${chev}
+            </button>
+          </div>
+          <div class="collapse-body" id="more-body">
+            <div class="more-grid">
+              <button onclick="W.startGrammar()">Grammar Review</button>
+              <button onclick="W.addPattern()">Add Pattern</button>
+              <button onclick="W.addDiffPair()">Add Pair</button>
+              <button onclick="W.passageMode()">Passage Mode</button>
+              <button onclick="W.passageReview()">Passage Review</button>
+              <button onclick="W.manageIntros()">Intro Queue</button>
+            </div>
+          </div>
+        </div>
+      `;
+      $actions.innerHTML = "";
+      setupStartCollapse();
+    } catch (e) {
+      $card.innerHTML = `<span class="loading">Connection error. Retrying...</span>`;
+      setTimeout(renderStartScreen, 2000);
+    }
+  }
+
+  // ── add word flow ─────────────────────────────────────────
+  function addWord() {
+    state = "addword_input";
+    $card.innerHTML = `
+      <div style="align-self:stretch;display:flex;flex-direction:column;gap:14px;">
+        <div style="text-align:center;font-size:18px;">Add a word or phrase</div>
+        <input id="addword-input" type="text"
+               placeholder="Korean word or phrase..."
+               autocomplete="off" autocapitalize="off" autocorrect="off"
+               style="width:100%;padding:10px;font-size:18px;
+                      background:var(--card-bg);color:var(--text);
+                      border:1px solid var(--border);border-radius:8px;
+                      font-family:inherit;">
+        <label style="display:flex;align-items:flex-start;gap:8px;
+                      color:var(--text-dim);font-size:13px;cursor:pointer;
+                      line-height:1.45;">
+          <input id="addword-skip-norm" type="checkbox" style="margin-top:3px;flex:0 0 auto;">
+          <span>Treat as fixed phrase / idiom — skip particle stripping &amp; verb
+                deconjugation (use for things like
+                <span style="color:var(--text);">이래 봬도</span>,
+                <span style="color:var(--text);">알다시피</span>).</span>
+        </label>
+      </div>`;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.submitAddWordInput()">Define</button>
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>`;
+    setTimeout(function() {
+      const $in = document.getElementById("addword-input");
+      if (!$in) return;
+      $in.focus();
+      $in.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") submitAddWordInput();
+      });
+    }, 30);
+  }
+
+  // ── sense picker (shared by Add-Word form and click-to-add) ────────
+  let sensePickerState = null;
+
+  function sensePickerRows(senses) {
+    return senses.map(function(s) {
+      const h = (s.hanja && s.hanja.has_hanja && s.hanja.hanja) ? s.hanja.hanja : "";
+      const hchip = h ? `<span class="sense-hanja">${esc(h)}</span>` : "";
+      const note = s.exists ? `<span class="sense-exists">✓ in deck</span>` : "";
+      return `
+        <label class="sense-row ${s.exists ? "sense-row-exists" : ""}">
+          <input type="checkbox" class="sense-cb" data-slug="${escAttr(s.slug)}"
+                 ${s._checked ? "checked" : ""} ${s.exists ? "disabled" : ""}>
+          <span class="sense-text">${hchip}<span class="sense-def">${esc(s.definition_en)}</span>${note}</span>
+        </label>`;
+    }).join("");
+  }
+
+  // data = {word, senses:[{slug,definition_en,hanja,exists}], tagged, context_slug, all_exist}
+  // opts = {mode:"form"|"click", el}
+  function showSensePicker(data, opts) {
+    const mode = opts.mode;
+    const el = opts.el || null;
+    const multi = data.senses.length > 1;
+    // default-checked: form → all not-yet-added; click → the contextual sense
+    data.senses.forEach(function(s) {
+      s._checked = (mode === "click" && data.context_slug)
+        ? (!s.exists && s.slug === data.context_slug)
+        : !s.exists;
+    });
+    if (mode === "click" && data.context_slug && !data.senses.some(function(s){ return s._checked; })) {
+      data.senses.forEach(function(s){ s._checked = !s.exists; });
+    }
+    sensePickerState = { word: data.word, senses: data.senses, tagged: data.tagged, mode: mode, el: el };
+
+    const sub = multi
+      ? `<div class="picker-sub">${data.all_exist ? "All senses already in your deck." : "Multiple senses — choose which to add."}</div>`
+      : (data.all_exist ? `<div class="picker-sub">Already in your deck.</div>` : "");
+    const addBtn = data.all_exist ? ""
+      : `<button class="btn-primary" onclick="W.submitSensePicker()">Add${multi ? " selected" : ""}</button>`;
+    const listHtml = `
+      <div class="def-term">${esc(data.word)}</div>
+      ${sub}
+      <div class="sense-list">${sensePickerRows(data.senses)}</div>`;
+
+    if (mode === "click") {
+      document.getElementById("clickadd-body").innerHTML = listHtml + `
+        <div class="btn-row" style="margin-top:16px;">
+          ${addBtn}
+          <button class="btn-secondary" onclick="W.closeClickAdd()">${data.all_exist ? "Close" : "Cancel"}</button>
+        </div>`;
+      if (data.all_exist && el) el.classList.add("cw-added");
+    } else {
+      state = "sense_picker";
+      $card.innerHTML = listHtml;
+      $actions.innerHTML = `
+        <div class="btn-row">
+          ${addBtn}
+          <button class="btn-secondary" onclick="W.backToStart()">${data.all_exist ? "Back" : "Cancel"}</button>
+        </div>`;
+    }
+  }
+
+  async function submitSensePicker() {
+    const st = sensePickerState;
+    if (!st) return;
+    const root = st.mode === "click" ? document.getElementById("clickadd-body") : $card;
+    const checked = Array.from(root.querySelectorAll(".sense-cb"))
+      .filter(function(cb){ return cb.checked && !cb.disabled; })
+      .map(function(cb){ return cb.getAttribute("data-slug"); });
+    if (!checked.length) { showToast("Select at least one sense", "error", 3000); return; }
+    const senses = st.senses
+      .filter(function(s){ return checked.indexOf(s.slug) !== -1; })
+      .map(function(s){ return { slug: s.slug, definition_en: s.definition_en, hanja: s.hanja }; });
+    const word = st.word, el = st.el, hotAdd = st.mode === "form", tagged = st.tagged;
+
+    if (st.mode === "click") closeClickAddModal(); else backToStart();
+
+    let data;
+    try {
+      data = await api("POST", "/api/confirm-add-word",
+        { word: word, senses: senses, tagged: tagged, hot_add: hotAdd });
+    } catch (e) {
+      showToast("Failed to add " + word + " — connection error", "error", 8000); return;
+    }
+    if (!data.ok) { showToast("Failed: " + word + " — " + (data.error || "unknown error"), "error", 8000); return; }
+    if (st.mode === "click" && el) {
+      clickAddedWords.add(el.getAttribute("data-word"));
+      el.classList.add("cw-added");
+    }
+    pollWordGen(data.task_id, word);
+  }
+
+  async function submitAddWordInput() {
+    const $in = document.getElementById("addword-input");
+    const $skip = document.getElementById("addword-skip-norm");
+    if (!$in) return;
+    const word = ($in.value || "").trim();
+    if (!word) return;
+    const skipNormalize = !!($skip && $skip.checked);
+
+    pendingWord = word;
+    state = "defining";
+
+    $card.innerHTML = `
+      <div class="spinner"></div>
+      <span class="loading">Looking up definition...</span>
+    `;
+    $actions.innerHTML = "";
+
+    try {
+      const data = await api("POST", "/api/define-word",
+        { word: pendingWord, skip_normalize: skipNormalize });
+
+      if (!data.ok) {
+        $card.innerHTML = `<div class="error-text">${esc(data.error || "lookup failed")}</div>`;
+        $actions.innerHTML = `
+          <div class="btn-row">
+            <button class="btn-secondary" onclick="W.backToStart()">Back</button>
+          </div>
+        `;
+        return;
+      }
+
+      showSensePicker(data, { mode: "form" });
+    } catch (e) {
+      $card.innerHTML = `
+        <div class="error-text">Connection error</div>
+      `;
+      $actions.innerHTML = `
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="W.backToStart()">Back</button>
+        </div>
+      `;
+    }
+  }
+
+  function renderConfirmDef() {
+    state = "confirm_def";
+    const p = pendingParsed;
+
+    let examplesHtml = "";
+    if (p.examples && p.examples.length > 0) {
+      examplesHtml = `
+        <div class="def-section">
+          <div class="def-section-label">Examples</div>
+          <ul class="def-examples">
+            ${p.examples.map(function(ex, i) { return "<li>" + (i+1) + ". " + esc(ex) + "</li>"; }).join("")}
+          </ul>
+        </div>
+      `;
+    }
+
+    $card.innerHTML = `
+      <div class="def-term">${esc(p.term)}</div>
+      <div class="def-section">
+        <div class="def-section-label">English</div>
+        <div>${esc(p.def_en)}</div>
+      </div>
+      <div class="def-section">
+        <div class="def-section-label">Korean</div>
+        <div>${esc(p.def_ko)}</div>
+      </div>
+      ${examplesHtml}
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.confirmAdd()">Add This Word</button>
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>
+    `;
+  }
+
+  function showToast(msg, type, duration) {
+    const $c = document.getElementById("toast-container");
+    const el = document.createElement("div");
+    el.className = "toast toast-" + type;
+    el.textContent = msg;
+    $c.appendChild(el);
+    if (duration) setTimeout(function() { el.remove(); }, duration);
+    return el;
+  }
+
+  function pollWordGen(taskId, word) {
+    const toastEl = showToast("Generating cards for " + word + "...", "pending");
+    const poll = setInterval(async function() {
+      try {
+        const data = await api("GET", "/api/word-gen-status/" + taskId);
+        if (data.status === "done") {
+          clearInterval(poll);
+          toastEl.remove();
+          showToast(word + " added", "success", 4000);
+        } else if (data.status === "error") {
+          clearInterval(poll);
+          toastEl.remove();
+          showToast("Failed: " + word + " — " + (data.message || "unknown error"), "error", 8000);
+        }
+      } catch (e) {
+        clearInterval(poll);
+        toastEl.remove();
+        showToast("Failed: " + word + " — connection error", "error", 8000);
+      }
+    }, 3000);
+  }
+
+  async function confirmAdd() {
+    // use the normalized dictionary form the LLM returned, not the raw input
+    const word = (pendingParsed && pendingParsed.term) || pendingWord;
+    try {
+      const data = await api("POST", "/api/confirm-add-word", {
+        word: word,
+        def_block: pendingDefBlock,
+      });
+
+      if (!data.ok) {
+        showToast("Failed to start generation for " + word, "error", 6000);
+        backToStart();
+        return;
+      }
+
+      // Start background polling and return to start screen immediately
+      pollWordGen(data.task_id, word);
+      backToStart();
+    } catch (e) {
+      showToast("Connection error adding " + word, "error", 6000);
+      backToStart();
+    }
+  }
+
+  // ── add diff pair flow ──────────────────────────────────
+  async function addDiffPair() {
+    const wordA = prompt("Word A (Korean):");
+    if (!wordA || !wordA.trim()) return;
+    const wordB = prompt("Word B (Korean):");
+    if (!wordB || !wordB.trim()) return;
+
+    pendingDiffA = wordA.trim();
+    pendingDiffB = wordB.trim();
+    state = "defining";
+
+    $card.innerHTML = `
+      <div class="spinner"></div>
+      <span class="loading">Looking up definitions for ${esc(pendingDiffA)} / ${esc(pendingDiffB)}...</span>
+    `;
+    $actions.innerHTML = "";
+
+    try {
+      const data = await api("POST", "/api/define-diff-pair", {
+        word_a: pendingDiffA,
+        word_b: pendingDiffB,
+      });
+
+      if (!data.ok) {
+        $card.innerHTML = `<div class="error-text">${esc(data.error)}</div>`;
+        $actions.innerHTML = `
+          <div class="btn-row">
+            <button class="btn-secondary" onclick="W.backToStart()">Back</button>
+          </div>`;
+        return;
+      }
+
+      pendingDiffParsedA = data.parsed_a;
+      pendingDiffParsedB = data.parsed_b;
+      pendingDiffDefBlockA = data.def_block_a;
+      pendingDiffDefBlockB = data.def_block_b;
+      renderConfirmDiffPair();
+    } catch (e) {
+      $card.innerHTML = `<div class="error-text">Connection error</div>`;
+      $actions.innerHTML = `
+        <div class="btn-row">
+          <button class="btn-secondary" onclick="W.backToStart()">Back</button>
+        </div>`;
+    }
+  }
+
+  function renderConfirmDiffPair() {
+    state = "confirm_def";
+    const a = pendingDiffParsedA;
+    const b = pendingDiffParsedB;
+
+    function defHtml(p) {
+      let ex = "";
+      if (p.examples && p.examples.length > 0) {
+        ex = `<div class="def-section">
+          <div class="def-section-label">Examples</div>
+          <ul class="def-examples">
+            ${p.examples.map(function(e, i) { return "<li>" + (i+1) + ". " + esc(e) + "</li>"; }).join("")}
+          </ul>
+        </div>`;
+      }
+      return `
+        <div class="def-term">${esc(p.term)}</div>
+        <div class="def-section">
+          <div class="def-section-label">English</div>
+          <div>${esc(p.def_en)}</div>
+        </div>
+        <div class="def-section">
+          <div class="def-section-label">Korean</div>
+          <div>${esc(p.def_ko)}</div>
+        </div>
+        ${ex}`;
+    }
+
+    $card.innerHTML = `
+      <div style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px;">
+        ${defHtml(a)}
+      </div>
+      ${defHtml(b)}
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.confirmAddDiffPair()">Add Pair</button>
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>`;
+  }
+
+  async function confirmAddDiffPair() {
+    try {
+      const data = await api("POST", "/api/confirm-add-diff-pair", {
+        word_a: pendingDiffA,
+        word_b: pendingDiffB,
+        def_block_a: pendingDiffDefBlockA,
+        def_block_b: pendingDiffDefBlockB,
+      });
+
+      if (!data.ok) {
+        showToast("Failed to start generation for " + pendingDiffA + "~" + pendingDiffB, "error", 6000);
+        backToStart();
+        return;
+      }
+
+      pollWordGen(data.task_id, pendingDiffA + "~" + pendingDiffB);
+      backToStart();
+    } catch (e) {
+      showToast("Connection error adding pair", "error", 6000);
+      backToStart();
+    }
+  }
+
+  async function addNewWords() {
+    const $input = document.getElementById("add-words-count");
+    const $feedback = document.getElementById("add-words-feedback");
+    if (!$input) return;
+    const n = parseInt($input.value, 10);
+    if (!n || n < 1) return;
+    try {
+      const data = await api("POST", "/api/add-new-words", { count: n });
+      if (data.ok) {
+        if ($feedback) {
+          $feedback.textContent = `+${data.added} added`;
+          setTimeout(function() { $feedback.textContent = ""; }, 3000);
+        }
+        if (data.counts) updateStatus(data.counts);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  async function activateGrammar() {
+    const $input = document.getElementById("grammar-activate-count");
+    const $feedback = document.getElementById("grammar-activate-feedback");
+    if (!$input) return;
+    const n = parseInt($input.value, 10);
+    if (!n || n < 1) return;
+    try {
+      const data = await api("POST", "/api/grammar/activate-patterns", { count: n });
+      if (data.ok) {
+        if ($feedback) {
+          $feedback.textContent = `+${data.activated} activated`;
+          setTimeout(function() { $feedback.textContent = ""; }, 3000);
+        }
+        // Refresh start screen to update counts
+        renderStartScreen();
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  async function adjustParam(param, delta) {
+    const body = {};
+    if (param === "target_new") {
+      body.target_new = targetNew + delta;
+    } else {
+      body.queue_size = queueSize + delta;
+    }
+    try {
+      const data = await api("POST", "/api/update-session-params", body);
+      if (data.ok) {
+        targetNew = data.target_new;
+        queueSize = data.queue_size;
+        const $tn = document.getElementById("param-target-new");
+        const $qs = document.getElementById("param-queue-size");
+        if ($tn) $tn.textContent = targetNew;
+        if ($qs) $qs.textContent = queueSize;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // ── intro queue manager ───────────────────────────────────
+  let introItems = [];        // full ordered list of intro entries
+  let introTargetNew = 0;     // how many enter a session
+  let introDirty = false;     // unsaved local reorder
+  let introFilter = "";
+  let imDragLex = null;
+
+  async function manageIntros() {
+    state = "intro_mgr";
+    $card.innerHTML = `<div class="spinner"></div><span class="loading">Loading intro queue...</span>`;
+    $actions.innerHTML = "";
+    showStatusBar(false);
+    try {
+      const data = await api("GET", "/api/intro-queue");
+      introItems = data.items || [];
+      introTargetNew = data.target_new || 0;
+      introDirty = false;
+      introFilter = "";
+      renderIntroMgr();
+    } catch (e) {
+      $card.innerHTML = `<div class="error-text">Failed to load intro queue.</div>`;
+      $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+    }
+  }
+
+  function renderIntroMgr() {
+    const f = introFilter.trim().toLowerCase();
+    const ranked = introItems.filter(x => x.ranked).length;
+    const rows = [];
+    introItems.forEach(function(x, i) {
+      const hit = !f || x.headword.toLowerCase().includes(f)
+        || (x.sense || "").toLowerCase().includes(f)
+        || (x.gloss || "").toLowerCase().includes(f);
+      if (!f && i === introTargetNew && introTargetNew > 0) {
+        rows.push(`<div class="im-divider">↑ next ${introTargetNew} introduced each session ↑</div>`);
+      }
+      if (!hit) return;
+      const sess = i < introTargetNew ? "session" : "";
+      const senseHtml = x.sense ? `<span class="im-sense">${esc(x.sense)}</span>` : "";
+      rows.push(`
+        <div class="im-row ${sess}" draggable="true" data-lex="${escAttr(x.lexeme)}">
+          <span class="im-handle">⠿</span>
+          <span class="im-rank">${i + 1}</span>
+          <span class="im-word">${esc(x.headword)}</span>
+          ${senseHtml}
+          <span class="im-gloss">${esc(x.gloss || "")}</span>
+          <span class="im-btns">
+            <button data-act="top" title="to top">⤒</button>
+            <button data-act="up" title="up">▲</button>
+            <button data-act="down" title="down">▼</button>
+          </span>
+        </div>`);
+    });
+    const listHtml = rows.length
+      ? rows.join("")
+      : `<div class="im-empty">No words match "${esc(introFilter)}".</div>`;
+    const dirtyTag = introDirty ? ` · <span class="dirty">unsaved</span>` : "";
+
+    $card.innerHTML = `
+      <div class="intro-mgr">
+        <div class="im-title">Intro Queue</div>
+        <div class="im-sub">Order in which unseen words get introduced. The top
+          ${introTargetNew} enter each session. Drag the handle, or use ⤒ / ▲ / ▼.</div>
+        <div class="im-tools">
+          <input id="im-search" class="im-search" type="text" placeholder="Filter by word, sense, or meaning…"
+                 autocomplete="off" autocapitalize="off" autocorrect="off" value="${escAttr(introFilter)}">
+          <button class="btn-secondary im-spread" onclick="W.spreadHomonyms()" title="Space same-spelling senses evenly apart">Spread homonyms</button>
+        </div>
+        <div class="im-meta-row"><span class="im-meta">${introItems.length} total · ${ranked} pinned${dirtyTag}</span></div>
+        <div class="im-list" id="im-list">${listHtml}</div>
+      </div>`;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button id="im-save" class="btn-primary" ${introDirty ? "" : "disabled"} onclick="W.saveIntroOrder()">Save order</button>
+        <button class="btn-secondary" onclick="W.introBack()">Back</button>
+      </div>`;
+    wireIntroMgr();
+  }
+
+  function wireIntroMgr() {
+    const $list = document.getElementById("im-list");
+    const $search = document.getElementById("im-search");
+    if ($search) {
+      $search.addEventListener("input", function() {
+        introFilter = $search.value;
+        const scroll = $list ? $list.scrollTop : 0;
+        renderIntroMgr();
+        // keep focus + caret in the search box across re-render
+        const $s = document.getElementById("im-search");
+        if ($s) { $s.focus(); $s.setSelectionRange($s.value.length, $s.value.length); }
+        const $l = document.getElementById("im-list");
+        if ($l) $l.scrollTop = scroll;
+      });
+    }
+    if (!$list) return;
+
+    // button clicks (event delegation)
+    $list.addEventListener("click", function(e) {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const row = e.target.closest(".im-row");
+      if (!row) return;
+      const lex = row.getAttribute("data-lex");
+      const act = btn.getAttribute("data-act");
+      if (act === "top") introMoveToTop(lex);
+      else if (act === "up") introMove(lex, -1);
+      else if (act === "down") introMove(lex, 1);
+    });
+
+    // drag-and-drop reorder
+    $list.addEventListener("dragstart", function(e) {
+      const row = e.target.closest(".im-row");
+      if (!row) return;
+      imDragLex = row.getAttribute("data-lex");
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    $list.addEventListener("dragend", function(e) {
+      const row = e.target.closest(".im-row");
+      if (row) row.classList.remove("dragging");
+      $list.querySelectorAll(".drop-above").forEach(r => r.classList.remove("drop-above"));
+      imDragLex = null;
+    });
+    $list.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      const row = e.target.closest(".im-row");
+      $list.querySelectorAll(".drop-above").forEach(r => r.classList.remove("drop-above"));
+      if (row && row.getAttribute("data-lex") !== imDragLex) row.classList.add("drop-above");
+    });
+    $list.addEventListener("drop", function(e) {
+      e.preventDefault();
+      const row = e.target.closest(".im-row");
+      if (!row || imDragLex == null) return;
+      const targetLex = row.getAttribute("data-lex");
+      introReorderBefore(imDragLex, targetLex);
+    });
+  }
+
+  function _introIndex(lex) { return introItems.findIndex(x => x.lexeme === lex); }
+
+  function introMoveToTop(lex) {
+    const i = _introIndex(lex);
+    if (i <= 0) return;
+    const [it] = introItems.splice(i, 1);
+    introItems.unshift(it);
+    introDirty = true;
+    _rerenderIntroPreserve();
+  }
+  function introMove(lex, dir) {
+    const i = _introIndex(lex);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= introItems.length) return;
+    const t = introItems[i]; introItems[i] = introItems[j]; introItems[j] = t;
+    introDirty = true;
+    _rerenderIntroPreserve();
+  }
+  function introReorderBefore(lex, targetLex) {
+    if (lex === targetLex) return;
+    const from = _introIndex(lex);
+    if (from < 0) return;
+    const [it] = introItems.splice(from, 1);
+    let to = _introIndex(targetLex);       // index AFTER removal
+    if (to < 0) to = introItems.length;
+    introItems.splice(to, 0, it);
+    introDirty = true;
+    _rerenderIntroPreserve();
+  }
+
+  function _rerenderIntroPreserve() {
+    const $l = document.getElementById("im-list");
+    const scroll = $l ? $l.scrollTop : 0;
+    renderIntroMgr();
+    const $l2 = document.getElementById("im-list");
+    if ($l2) $l2.scrollTop = scroll;
+  }
+
+  async function saveIntroOrder() {
+    const btn = document.getElementById("im-save");
+    if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+    try {
+      const data = await api("POST", "/api/intro-queue/reorder",
+        { order: introItems.map(x => x.lexeme) });
+      if (data && data.ok) {
+        introItems = data.items || introItems;
+        introTargetNew = data.target_new || introTargetNew;
+        introDirty = false;
+        renderIntroMgr();
+        showToast("Intro order saved" + (data.in_session ? " · session updated" : ""), "success", 3000);
+      } else {
+        showToast((data && data.error) || "Save failed", "error", 4000);
+        if (btn) { btn.disabled = false; btn.textContent = "Save order"; }
+      }
+    } catch (e) {
+      showToast("Save failed", "error", 4000);
+      if (btn) { btn.disabled = false; btn.textContent = "Save order"; }
+    }
+  }
+
+  async function spreadHomonyms() {
+    if (introDirty && !confirm("Spread homonyms now? This discards your unsaved manual changes.")) return;
+    const btn = document.querySelector(".im-spread");
+    if (btn) { btn.disabled = true; btn.textContent = "Spreading…"; }
+    try {
+      const data = await api("POST", "/api/intro-queue/spread-homonyms");
+      if (data && data.ok) {
+        introItems = data.items || introItems;
+        introTargetNew = data.target_new || introTargetNew;
+        introDirty = false;
+        renderIntroMgr();
+        const n = data.spread_groups || 0;
+        showToast(`Spread ${n} homonym${n !== 1 ? "s" : ""} across the queue`
+          + (data.in_session ? " · session updated" : ""), "success", 3500);
+      } else {
+        showToast((data && data.error) || "Spread failed", "error", 4000);
+        if (btn) { btn.disabled = false; btn.textContent = "Spread homonyms"; }
+      }
+    } catch (e) {
+      showToast("Spread failed", "error", 4000);
+      if (btn) { btn.disabled = false; btn.textContent = "Spread homonyms"; }
+    }
+  }
+
+  function introBack() {
+    if (introDirty && !confirm("Discard unsaved order changes?")) return;
+    introDirty = false;
+    backToStart();
+  }
+
+  function backToStart() {
+    pendingWord = "";
+    pendingParsed = null;
+    pendingDefBlock = "";
+    pendingPattern = "";
+    pendingPatternParsed = null;
+    grammarMode = false;
+    clearInterval(grammarWaitTimer);
+    renderStartScreen();
+  }
+
+  // ── start session ─────────────────────────────────────────
+  async function startSession() {
+    state = "loading";
+    $card.innerHTML = `
+      <div class="spinner"></div>
+      <span class="loading">Starting session...</span>
+    `;
+    $actions.innerHTML = "";
+
+    try {
+      const data = await api("POST", "/api/start-session");
+      if (!data.ok) {
+        $card.innerHTML = `<div class="error-text">${esc(data.error || "Failed to start session")}</div>`;
+        $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+        return;
+      }
+      showStatusBar(true);
+      if (data.counts) updateStatus(data.counts);
+      fetchNext();
+    } catch (e) {
+      $card.innerHTML = `<span class="loading">Connection error. Retrying...</span>`;
+      setTimeout(startSession, 2000);
+    }
+  }
+
+  function resumeSession() {
+    showStatusBar(true);
+    fetchNext();
+  }
+
+  // ── render functions ────────────────────────────────────
+  // ── hanja (recognition cards only) ──────────────────────
+  // Three states keyed on c.hanja: undefined/null → never looked up (show
+  // button); {has_hanja:true,...} → render the breakdown; {has_hanja:false}
+  // → looked up, nothing to show (muted note, no re-query button).
+  function renderHanja(c) {
+    const isProd = c.skill_type && c.skill_type.includes("prod");
+    if (isProd) return "";
+    const h = c.hanja;
+    if (h === undefined || h === null) {
+      return `<div class="card-hanja-actions">
+        <button id="hanja-btn" class="hanja-btn" onclick="W.lookupHanja()">한자 보기 · Hanja</button>
+      </div>`;
+    }
+    if (h.error) {
+      // transient lookup failure — offer a retry, never mislabel as "no hanja"
+      return `<div class="card-hanja-actions">
+        <button id="hanja-btn" class="hanja-btn" onclick="W.lookupHanja()">한자 다시 시도 · Retry Hanja</button>
+        <div class="card-hanja-none" style="margin-top:6px;">lookup failed — tap to retry</div>
+      </div>`;
+    }
+    if (!h.has_hanja) {
+      return `<div class="card-hanja-none">한자 없음 · no hanja</div>`;
+    }
+    const rows = (h.chars || []).map(ch => {
+      const ex = (ch.examples && ch.examples.length)
+        ? `<td class="hc-ex">${esc(ch.examples.join(", "))}</td>` : `<td class="hc-ex"></td>`;
+      return `<tr>
+        <td class="hc-char">${esc(ch.char)}</td>
+        <td class="hc-read">${esc(ch.reading)}</td>
+        <td class="hc-mean">${esc(ch.meaning)}</td>
+        ${ex}
+      </tr>`;
+    }).join("");
+    const gloss = h.gloss ? `<div class="hanja-gloss">${esc(h.gloss)}</div>` : "";
+    return `<div class="card-hanja">
+      <div class="hanja-word">${esc(h.hanja)}</div>
+      ${gloss}
+      <table>${rows}</table>
+    </div>`;
+  }
+
+  async function lookupHanja() {
+    if (!card) return;
+    const el = document.getElementById("hanja-btn");
+    if (el) { el.textContent = "한자 찾는 중…"; el.disabled = true; }
+    let res;
+    try {
+      res = await api("POST", "/api/hanja-lookup");
+    } catch (e) {
+      res = { error: "network" };
+    }
+    // Only a real result {has_hanja: bool} is kept; anything else (backend
+    // {error:...} or a network error) becomes a retryable error sentinel so we
+    // never show "no hanja" for a lookup that merely failed.
+    card.hanja = (res && typeof res.has_hanja === "boolean") ? res : { error: (res && res.error) || "network" };
+    if (state === "back") renderBack();
+    else if (state === "intro") renderIntro();
+  }
+
+  // Shared back-of-card answer block (Ink layout):
+  //   sentence translation → rule → base word (lemma, blue) — definition → hanja
+  function answerBlock(c) {
+    const isProd = c.skill_type && c.skill_type.includes("prod");
+    const translation = (c.translation_en && !isProd)
+      ? `<div class="card-translation">${esc(c.translation_en)}</div>` : "";
+    const lemma = c.headword || "";
+    const entry = isProd
+      ? `<div class="card-back">${esc(c.back)}</div>`
+      : `<div class="card-entry">${lemma ? `<span class="lemma">${esc(lemma)}</span><span class="sep">—</span>` : ""}${esc(c.back)}</div>`;
+    return `
+      ${translation}
+      <div class="card-divider"></div>
+      ${entry}
+      ${renderHanja(c)}
+    `;
+  }
+
+  function renderIntro() {
+    state = "intro";
+    const c = card;
+    $card.innerHTML = `
+      <span class="card-label label-intro">Intro</span>
+      ${renderCardFront(c)}
+      ${answerBlock(c)}
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.submitIntro()">Next</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.editCard()">Edit</button>
+        <button class="btn-secondary" onclick="W.deleteVariant()">Delete</button>
+        <button class="btn-secondary" onclick="W.addVariant()">Add</button>
+        <button class="btn-secondary" onclick="W.quarantineWord()">Quarantine</button>
+      </div>
+    `;
+  }
+
+  function renderFront() {
+    state = "front";
+    const c = card;
+    $card.innerHTML = `
+      ${reviewLabel(c)}
+      ${renderCardFront(c)}
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.showAnswer()">Show Answer</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.editCard()">Edit</button>
+        <button class="btn-secondary" onclick="W.deleteVariant()">Delete</button>
+        <button class="btn-secondary" onclick="W.addVariant()">Add</button>
+        <button class="btn-secondary" onclick="W.quarantineWord()">Quarantine</button>
+      </div>
+    `;
+  }
+
+  function renderBack() {
+    state = "back";
+    const c = card;
+    $card.innerHTML = `
+      ${reviewLabel(c)}
+      ${renderCardFront(c)}
+      ${answerBlock(c)}
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-correct" onclick="W.grade(1)">1<span class="grade-label">F|C</span></button>
+        <button class="btn-correct" onclick="W.grade(2)">2<span class="grade-label">N|C</span></button>
+        <button class="btn-correct" onclick="W.grade(3)">3<span class="grade-label">H|C</span></button>
+        <button class="btn-wrong" onclick="W.grade(4)">4<span class="grade-label">Easy W</span></button>
+        <button class="btn-wrong" onclick="W.grade(5)">5<span class="grade-label">Hard W</span></button>
+        <button class="btn-noidea" onclick="W.grade(6)">6<span class="grade-label">No Idea</span></button>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.editCard()">Edit</button>
+        <button class="btn-secondary" onclick="W.deleteVariant()">Delete</button>
+        <button class="btn-secondary" onclick="W.addVariant()">Add</button>
+        <button class="btn-secondary" onclick="W.quarantineWord()">Quarantine</button>
+      </div>
+    `;
+  }
+
+  function renderWaiting(secs) {
+    state = "waiting";
+    clearInterval(waitTimer);
+    waitSeconds = secs;
+    $card.innerHTML = `
+      <div class="waiting-text" id="countdown">${fmtCountdown(waitSeconds)}</div>
+      <div class="waiting-label">Next card due</div>
+    `;
+    $actions.innerHTML = "";
+
+    const $cd = document.getElementById("countdown");
+    waitTimer = setInterval(function() {
+      waitSeconds -= 1;
+      if (waitSeconds <= 0) {
+        clearInterval(waitTimer);
+        fetchNext();
+        return;
+      }
+      if ($cd) $cd.textContent = fmtCountdown(waitSeconds);
+    }, 1000);
+  }
+
+  function renderComplete() {
+    state = "complete";
+    clearInterval(waitTimer);
+    const c = counts || {};
+    const acc = c.total_graded > 0 ? Math.round(c.correct_count / c.total_graded * 100) + "%" : "--";
+    $card.innerHTML = `
+      <div class="complete-text">
+        Session complete<br><br>
+        Cards graded: ${c.total_graded || 0}<br>
+        Accuracy: ${acc}<br>
+        Words graduated: ${c.target_done || 0}
+      </div>
+    `;
+    $actions.innerHTML = "";
+  }
+
+  function renderLoading() {
+    state = "loading";
+    $card.innerHTML = `<span class="loading">Loading...</span>`;
+    $actions.innerHTML = "";
+  }
+
+  // ── fetch next card ─────────────────────────────────────
+  async function fetchNext() {
+    renderLoading();
+    try {
+      const data = await api("GET", "/api/next");
+      if (data.counts) updateStatus(data.counts);
+      updateRepairMode(data);
+
+      if (data.state === "card") {
+        card = data.card;
+        if (card.review_mode === "intro") {
+          renderIntro();
+        } else {
+          renderFront();
+        }
+      } else if (data.state === "waiting") {
+        renderWaiting(data.seconds_until_next_due || 0);
+      } else if (data.state === "complete") {
+        renderComplete();
+      }
+    } catch (e) {
+      $card.innerHTML = `<span class="loading">Connection error. Retrying...</span>`;
+      setTimeout(fetchNext, 2000);
+    }
+  }
+
+  // ── actions ─────────────────────────────────────────────
+  async function submitIntro() {
+    renderLoading();
+    const data = await api("POST", "/api/submit-intro");
+    if (data.counts) updateStatus(data.counts);
+    fetchNext();
+  }
+
+  function showAnswer() {
+    renderBack();
+  }
+
+  async function submitGrade(g) {
+    renderLoading();
+    const data = await api("POST", "/api/submit-review", { grade: g });
+    if (data.counts) updateStatus(data.counts);
+    const logEl = document.getElementById("st-review-log");
+    if (data.review_log && logEl) {
+      logEl.textContent = data.review_log;
+      logEl.style.color = "var(--text-dim)";
+    }
+    updateRepairMode(data);
+    // Retype-after-miss removed: review is recognition-only, and the repair flow
+    // re-shows missed words — re-typing them adds nothing. Just move on.
+    fetchNext();
+  }
+
+  async function editCard() {
+    if (!card) return;
+    const newFront = prompt("Edit front:", card.front);
+    if (newFront === null) return;
+    const newBack = prompt("Edit back:", card.back);
+    if (newBack === null) return;
+    renderLoading();
+    const data = await api("POST", "/api/edit", { new_front: newFront, new_back: newBack });
+    if (data.counts) updateStatus(data.counts);
+    fetchNext();
+  }
+
+  async function deleteVariant() {
+    if (!confirm("Delete this variant?")) return;
+    renderLoading();
+    const data = await api("POST", "/api/delete-variant");
+    if (data.counts) updateStatus(data.counts);
+    fetchNext();
+  }
+
+  async function addVariant() {
+    const newFront = prompt("New variant front:");
+    if (!newFront) return;
+    const newBack = prompt("New variant back:");
+    if (!newBack) return;
+    renderLoading();
+    const data = await api("POST", "/api/add-variant", { new_front: newFront, new_back: newBack });
+    if (data.counts) updateStatus(data.counts);
+    fetchNext();
+  }
+
+  async function quarantineWord() {
+    if (!confirm("Quarantine this word? It will be suspended from all reviews.")) return;
+    renderLoading();
+    const data = await api("POST", "/api/quarantine");
+    if (data.counts) updateStatus(data.counts);
+    fetchNext();
+  }
+
+  // ── grammar mode ───────────────────────────────────────
+  async function startGrammar() {
+    grammarMode = true;
+    state = "loading";
+    $card.innerHTML = `<div class="spinner"></div><span class="loading">Starting grammar session...</span>`;
+    $actions.innerHTML = "";
+
+    try {
+      const data = await api("POST", "/api/grammar/start-session");
+      if (!data.ok) {
+        // session already active — just resume
+        if (data.error && data.error.includes("already active")) {
+          grammarFetchNext();
+          return;
+        }
+        $card.innerHTML = `<div class="error-text">${esc(data.error)}</div>`;
+        $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+        return;
+      }
+      grammarShowStatusBar(data);
+      grammarFetchNext();
+    } catch (e) {
+      $card.innerHTML = `<span class="loading">Connection error. Retrying...</span>`;
+      setTimeout(startGrammar, 2000);
+    }
+  }
+
+  function grammarShowStatusBar(countsOrData) {
+    const c = countsOrData.counts || countsOrData;
+    grammarCounts = c;
+    showStatusBar(true);
+    document.getElementById("st-due").textContent = `Due: ${c.due || 0}`;
+    document.getElementById("st-learning").textContent = `Patterns: ${c.total_patterns || 0}`;
+    const $acc = document.getElementById("st-accuracy");
+    const acc = c.total_graded > 0 ? Math.round(c.correct_count / c.total_graded * 100) : null;
+    $acc.textContent = acc !== null ? `${acc}%` : "";
+    document.getElementById("st-target-nums").textContent = `${c.total_graded || 0} graded`;
+    document.getElementById("st-progress").style.width = "0%";
+    document.getElementById("st-target-label").textContent = "Grammar:";
+  }
+
+  async function grammarFetchNext() {
+    state = "loading";
+    $card.innerHTML = `<span class="loading">Loading...</span>`;
+    $actions.innerHTML = "";
+
+    try {
+      const data = await api("GET", "/api/grammar/next");
+      if (data.counts) grammarShowStatusBar(data);
+
+      if (data.state === "question") {
+        grammarQuestion = data.question;
+        grammarEval = null;
+        renderGrammarQuestion();
+      } else if (data.state === "feedback") {
+        grammarQuestion = data.question;
+        grammarEval = data.evaluation;
+        renderGrammarFeedback();
+      } else if (data.state === "waiting") {
+        renderGrammarWaiting(data.seconds_until_next_due || 0);
+      } else if (data.state === "empty") {
+        $card.innerHTML = `<div class="complete-text">No grammar patterns yet.<br>Add some from the start screen.</div>`;
+        $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.endGrammar()">Back</button></div>`;
+      }
+    } catch (e) {
+      $card.innerHTML = `<span class="loading">Connection error. Retrying...</span>`;
+      setTimeout(grammarFetchNext, 2000);
+    }
+  }
+
+  function renderGrammarQuestion() {
+    state = "grammar_question";
+    $card.innerHTML = `
+      <div class="grammar-question">${esc(grammarQuestion)}</div>
+      <input class="grammar-input" id="grammar-answer" type="text"
+             placeholder="Type your answer..." autocomplete="off"
+             autocapitalize="off" spellcheck="false">
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.grammarSubmitAnswer()">Submit</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.endGrammar()">Quit</button>
+      </div>
+    `;
+    const $input = document.getElementById("grammar-answer");
+    if ($input) {
+      $input.focus();
+      $input.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") { e.preventDefault(); grammarSubmitAnswer(); }
+      });
+    }
+  }
+
+  async function grammarSubmitAnswer() {
+    const $input = document.getElementById("grammar-answer");
+    if (!$input) return;
+    const answer = $input.value.trim();
+    if (!answer) return;
+
+    $card.innerHTML = `<div class="spinner"></div><span class="loading">Evaluating...</span>`;
+    $actions.innerHTML = "";
+
+    try {
+      const data = await api("POST", "/api/grammar/submit-answer", { answer: answer });
+      if (data.counts) grammarShowStatusBar(data);
+      grammarEval = data.evaluation;
+      renderGrammarFeedback();
+    } catch (e) {
+      $card.innerHTML = `<span class="loading">Connection error. Retrying...</span>`;
+    }
+  }
+
+  function renderGrammarFeedback() {
+    state = "grammar_feedback";
+    const ev = grammarEval;
+
+    let feedbackHtml = "";
+    if (ev.correct) {
+      feedbackHtml = `<div class="grammar-feedback-correct">\u2713 Correct</div>`;
+    } else {
+      feedbackHtml = `<div class="grammar-feedback-wrong">\u2717 Wrong</div>`;
+      if (ev.feedback) {
+        feedbackHtml += `<div class="grammar-feedback-detail">${esc(ev.feedback)}</div>`;
+      }
+      if (ev.corrected) {
+        feedbackHtml += `<div class="grammar-feedback-detail">${esc(ev.corrected)}</div>`;
+      }
+    }
+
+    $card.innerHTML = `
+      <div class="grammar-question">${esc(grammarQuestion)}</div>
+      <div class="card-divider"></div>
+      <div class="grammar-user-answer">Your answer: ${esc(ev.answer)}</div>
+      <div style="margin-top:16px;">${feedbackHtml}</div>
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-correct" onclick="W.grammarGrade(1)">1<span class="grade-label">F|C</span></button>
+        <button class="btn-correct" onclick="W.grammarGrade(2)">2<span class="grade-label">N|C</span></button>
+        <button class="btn-correct" onclick="W.grammarGrade(3)">3<span class="grade-label">H|C</span></button>
+        <button class="btn-wrong" onclick="W.grammarGrade(4)">4<span class="grade-label">Easy W</span></button>
+        <button class="btn-wrong" onclick="W.grammarGrade(5)">5<span class="grade-label">Hard W</span></button>
+        <button class="btn-noidea" onclick="W.grammarGrade(6)">6<span class="grade-label">No Idea</span></button>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.endGrammar()">Quit</button>
+      </div>
+    `;
+  }
+
+  async function grammarGrade(g) {
+    $card.innerHTML = `<span class="loading">Loading...</span>`;
+    $actions.innerHTML = "";
+    try {
+      const data = await api("POST", "/api/grammar/submit-grade", { grade: g });
+      if (data.counts) grammarShowStatusBar(data);
+      grammarFetchNext();
+    } catch (e) {
+      $card.innerHTML = `<span class="loading">Connection error. Retrying...</span>`;
+      setTimeout(function() { grammarGrade(g); }, 2000);
+    }
+  }
+
+  function renderGrammarWaiting(secs) {
+    state = "grammar_waiting";
+    clearInterval(grammarWaitTimer);
+    grammarWaitSeconds = secs;
+    $card.innerHTML = `
+      <div class="waiting-text" id="grammar-countdown">${fmtCountdown(grammarWaitSeconds)}</div>
+      <div class="waiting-label">Next grammar card due</div>
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.endGrammar()">Quit</button>
+      </div>
+    `;
+
+    const $cd = document.getElementById("grammar-countdown");
+    grammarWaitTimer = setInterval(function() {
+      grammarWaitSeconds -= 1;
+      if (grammarWaitSeconds <= 0) {
+        clearInterval(grammarWaitTimer);
+        grammarFetchNext();
+        return;
+      }
+      if ($cd) $cd.textContent = fmtCountdown(grammarWaitSeconds);
+    }, 1000);
+  }
+
+  async function endGrammar() {
+    clearInterval(grammarWaitTimer);
+    try {
+      const data = await api("POST", "/api/grammar/end-session");
+      const total = data.total_graded || 0;
+      const correct = data.correct_count || 0;
+      const acc = total > 0 ? Math.round(correct / total * 100) + "%" : "--";
+      showStatusBar(false);
+      $card.innerHTML = `
+        <div class="complete-text">
+          Grammar Session Complete<br><br>
+          Cards graded: ${total}<br>
+          Accuracy: ${acc}
+        </div>
+      `;
+      $actions.innerHTML = `
+        <div class="btn-row">
+          <button class="btn-primary" onclick="W.backToStart()">OK</button>
+        </div>
+      `;
+    } catch (e) {
+      grammarMode = false;
+      backToStart();
+    }
+  }
+
+  // ── grammar add pattern flow ──────────────────────────────
+  async function addPattern() {
+    const pattern = prompt("Grammar pattern to add:");
+    if (!pattern || !pattern.trim()) return;
+
+    pendingPattern = pattern.trim();
+    state = "defining";
+
+    $card.innerHTML = `
+      <div class="spinner"></div>
+      <span class="loading">Looking up grammar pattern...</span>
+    `;
+    $actions.innerHTML = "";
+
+    try {
+      const data = await api("POST", "/api/grammar/define-pattern", { pattern: pendingPattern });
+      if (!data.ok) {
+        $card.innerHTML = `<div class="error-text">${esc(data.error)}</div>`;
+        $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+        return;
+      }
+      pendingPatternParsed = data.parsed;
+      renderConfirmPattern();
+    } catch (e) {
+      $card.innerHTML = `<div class="error-text">Connection error</div>`;
+      $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+    }
+  }
+
+  function renderConfirmPattern() {
+    state = "confirm_def";
+    const p = pendingPatternParsed;
+    $card.innerHTML = `
+      <div class="def-term">${esc(p.pattern || pendingPattern)}</div>
+      <div class="def-section">
+        <div class="def-section-label">English</div>
+        <div>${esc(p.meaning_en || "")}</div>
+      </div>
+      <div class="def-section">
+        <div class="def-section-label">Korean</div>
+        <div>${esc(p.meaning_ko || "")}</div>
+      </div>
+      ${p.example ? `<div class="def-section"><div class="def-section-label">Example</div><div>${esc(p.example)}</div></div>` : ""}
+      ${p.notes ? `<div class="def-section"><div class="def-section-label">Notes</div><div>${esc(p.notes)}</div></div>` : ""}
+    `;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.confirmAddPattern()">Add Pattern</button>
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>
+    `;
+  }
+
+  async function confirmAddPattern() {
+    state = "generating";
+    $card.innerHTML = `<div class="spinner"></div><span class="loading">Adding pattern...</span>`;
+    $actions.innerHTML = "";
+
+    const p = pendingPatternParsed;
+    try {
+      const data = await api("POST", "/api/grammar/confirm-add-pattern", {
+        pattern: p.pattern || pendingPattern,
+        meaning_en: p.meaning_en || "",
+        meaning_ko: p.meaning_ko || "",
+        example: p.example || "",
+        notes: p.notes || "",
+      });
+      if (!data.ok) {
+        $card.innerHTML = `<div class="error-text">${esc(data.error || data.message)}</div>`;
+        $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+        return;
+      }
+      $card.innerHTML = `<div class="success-text">${esc(data.message)}</div>`;
+      $actions.innerHTML = `<div class="btn-row"><button class="btn-primary" onclick="W.backToStart()">OK</button></div>`;
+    } catch (e) {
+      $card.innerHTML = `<div class="error-text">Connection error</div>`;
+      $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+    }
+  }
+
+  // ── hint splitting ──────────────────────────────────────
+  function splitHint(front) {
+    const m = front.match(/^(.*?)\s*(\[hint:.*\])\s*$/);
+    if (m) return { sentence: m[1], hint: m[2] };
+    return { sentence: front, hint: "" };
+  }
+
+  function reviewLabel(c) {
+    const mode = c && c.review_mode;
+    if (mode === "gate") return '<span class="card-label label-gate">Gate</span>';
+    if (mode === "repair") return '<span class="card-label label-repair">Repair</span>';
+    return '<span class="card-label label-review">Review</span>';
+  }
+
+  function renderCardFront(c) {
+    const isProd = c.skill_type && c.skill_type.includes("prod");
+    if (isProd) {
+      const { sentence, hint } = splitHint(c.front);
+      let html = "";
+      if (c.translation_en) html += `<div class="card-translation">${esc(c.translation_en)}</div>`;
+      html += `<div class="card-front">${esc(sentence)}</div>`;
+      if (hint) html += `<div class="card-hint">${esc(hint)}</div>`;
+      return html;
+    }
+    const isRecog = c.skill_type && c.skill_type.includes("recog");
+    if (isRecog) {
+      const cleaned = c.front.replace(/\n\n질문:.*$/, "");
+      return `<div class="card-front">${renderRecogSentence(cleaned, c.headword)}</div>`;
+    }
+    return `<div class="card-front">${esc(c.front)}</div>`;
+  }
+
+  // ── click-to-add: clickable words in a recognition sentence ──────
+  const clickAddedWords = new Set();
+  let clickAddState = null;  // { word, el, parsed, defBlock }
+
+  // Render a recognition sentence: the [[target]] is highlighted (not
+  // clickable); every other Korean word is a clickable add-card trigger.
+  // The [[...]] target is matched on the full string first, so multi-word
+  // targets (which contain spaces) render as a single highlight.
+  function renderRecogSentence(text, headword) {
+    // Fallback: a few variants are missing the [[ ]] cloze markers, so the
+    // target wouldn't highlight. Bracket the headword (or its 하다/되다 stem,
+    // for conjugated adjectives/verbs like 저렴하다 → 저렴) so it still shows blue.
+    if (headword && !/\[\[.+?\]\]/.test(text)) {
+      const cands = [headword];
+      if (headword.endsWith("하다") || headword.endsWith("되다")) cands.push(headword.slice(0, -2));
+      for (const cand of cands) {
+        const idx = cand ? text.indexOf(cand) : -1;
+        if (idx !== -1) {
+          text = text.slice(0, idx) + "[[" + cand + "]]" + text.slice(idx + cand.length);
+          break;
+        }
+      }
+    }
+    let html = "";
+    const re = /\[\[(.+?)\]\]/g;
+    let last = 0, m;
+    while ((m = re.exec(text)) !== null) {
+      html += renderClickableRun(text.slice(last, m.index));
+      html += `<span class="highlight">${esc(m[1])}</span>`;
+      last = m.index + m[0].length;
+    }
+    html += renderClickableRun(text.slice(last));
+    return html;
+  }
+
+  // Tokenize a bracket-free run of text, making each Korean word clickable.
+  // opts.onclickAttr — full `onclick="..."` to attach (default = click-to-add).
+  // opts.trackAdded — when false, don't dim already-added words (default true).
+  function renderClickableRun(text, opts) {
+    if (!text) return "";
+    opts = opts || {};
+    const onclickAttr = opts.onclickAttr || 'onclick="W.clickAddWord(this)"';
+    const trackAdded = opts.trackAdded !== false;
+    const parts = text.split(/(\s+)/);
+    let html = "";
+    for (const part of parts) {
+      if (part === "") continue;
+      if (/^\s+$/.test(part)) { html += esc(part); continue; }
+      // peel leading/trailing punctuation off the Korean/latin core
+      const m = part.match(/^([^가-힣A-Za-z0-9]*)([\s\S]*?)([^가-힣A-Za-z0-9]*)$/);
+      const lead = m ? m[1] : "";
+      const core = m ? m[2] : part;
+      const trail = m ? m[3] : "";
+      if (core && /[가-힣]/.test(core)) {
+        const added = (trackAdded && clickAddedWords.has(core)) ? " cw-added" : "";
+        const handler = added ? "" : ' ' + onclickAttr;
+        html += esc(lead)
+          + `<span class="clickword${added}" data-word="${esc(core)}"${handler}>${esc(core)}</span>`
+          + esc(trail);
+      } else {
+        html += esc(part);
+      }
+    }
+    return html;
+  }
+
+  function closeClickAddModal() {
+    document.getElementById("clickadd-modal").style.display = "none";
+    clickAddState = null;
+  }
+
+  async function clickAddWord(el) {
+    if (!el || el.classList.contains("cw-added")) return;
+    const word = el.getAttribute("data-word");
+    if (!word) return;
+    clickAddState = { word: word, el: el };
+
+    const $modal = document.getElementById("clickadd-modal");
+    const $body = document.getElementById("clickadd-body");
+    $modal.style.display = "flex";
+    $body.innerHTML = `
+      <div class="spinner"></div>
+      <div class="loading" style="text-align:center;">Looking up "${esc(word)}"...</div>`;
+
+    // include the sentence the word was clicked in, for sense disambiguation.
+    // Prefer the surrounding passage-sentence (if rendered inside one);
+    // otherwise fall back to the current review card's sentence.
+    let sentence = "";
+    const sentEl = el.closest && el.closest(".passage-sentence");
+    if (sentEl) {
+      sentence = sentEl.getAttribute("data-sentence") || "";
+    } else if (card && card.front) {
+      sentence = card.front
+        .replace(/\n\n질문:[\s\S]*$/, "")
+        .replace(/\[\[(.+?)\]\]/g, "$1")
+        .trim();
+    }
+
+    let data;
+    try {
+      data = await api("POST", "/api/define-word", { word: word, context: sentence });
+    } catch (e) {
+      $body.innerHTML = `<div class="error-text">Connection error</div>
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn-secondary" onclick="W.closeClickAdd()">Close</button></div>`;
+      return;
+    }
+    if (!data.ok) {
+      $body.innerHTML = `<div class="error-text">${esc(data.error || "lookup failed")}</div>
+        <div class="btn-row" style="margin-top:16px;">
+          <button class="btn-secondary" onclick="W.closeClickAdd()">Close</button></div>`;
+      return;
+    }
+    // sense-inventory picker (contextual sense pre-checked for a clicked word)
+    showSensePicker(data, { mode: "click", el: el });
+  }
+
+  async function confirmClickAdd() {
+    if (!clickAddState || !clickAddState.defBlock) return;
+    const word = (clickAddState.parsed && clickAddState.parsed.term) || clickAddState.word;
+    const surface = clickAddState.word;
+    const defBlock = clickAddState.defBlock;
+    const el = clickAddState.el;
+    closeClickAddModal();
+
+    let data;
+    try {
+      data = await api("POST", "/api/confirm-add-word",
+                        { word: word, def_block: defBlock, hot_add: false });
+    } catch (e) {
+      showToast("Failed to add " + word + " — connection error", "error", 8000);
+      return;
+    }
+    if (!data.ok) {
+      showToast("Failed: " + word + " — " + (data.error || "unknown error"), "error", 8000);
+      return;
+    }
+    clickAddedWords.add(surface);
+    if (el) el.classList.add("cw-added");
+    pollWordGen(data.task_id, word);
+  }
+
+  // Extend an existing word's definition to cover a newly-detected sense.
+  async function extendSense() {
+    if (!clickAddState || !clickAddState.extendedDef) return;
+    const word = clickAddState.normWord || clickAddState.word;
+    const extended = clickAddState.extendedDef;
+    const sentence = clickAddState.contextSentence || "";
+    closeClickAddModal();
+    showToast("Extending " + word + "...", "pending");
+    let data;
+    try {
+      data = await api("POST", "/api/extend-word-sense",
+                        { word: word, extended_definition: extended, sentence: sentence });
+    } catch (e) {
+      showToast("Failed to extend " + word + " — connection error", "error", 8000);
+      return;
+    }
+    if (!data.ok) {
+      showToast("Failed: " + word + " — " + (data.error || "unknown"), "error", 8000);
+      return;
+    }
+    showToast(word + " — new sense added", "success", 4000);
+  }
+
+  // ── passage mode: paste a paragraph, click words to add ─────────
+  function passageMode() {
+    state = "passage";
+    $card.innerHTML = `
+      <div style="align-self:stretch;display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;color:var(--text-dim);font-size:14px;">
+          Paste a paragraph — click any word to add it to the SRS.
+        </div>
+        <textarea id="passage-input" placeholder="Paste Korean text here..."
+          style="width:100%;min-height:120px;padding:10px;font-size:16px;
+                 background:var(--card-bg);color:var(--text);
+                 border:1px solid var(--border);border-radius:8px;
+                 font-family:inherit;resize:vertical;word-break:keep-all;"></textarea>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="W.renderPassage()">Render</button>
+          <button class="btn-secondary" onclick="W.clearPassage()">Clear</button>
+        </div>
+        <div id="passage-output" class="passage-output"></div>
+      </div>`;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.backToStart()">Back</button>
+      </div>`;
+  }
+
+  // attribute-safe escape (extends esc with quote handling for attrs)
+  function escAttr(s) { return esc(s).replace(/"/g, "&quot;"); }
+
+  function renderPassage() {
+    const $in = document.getElementById("passage-input");
+    const $out = document.getElementById("passage-output");
+    if (!$in || !$out) return;
+    const text = ($in.value || "").trim();
+    if (!text) { $out.innerHTML = ""; return; }
+
+    // Split on blank lines into paragraphs, then on sentence-ending punct.
+    // Each sentence is wrapped so a click can pull its sentence as context.
+    const paragraphs = text.split(/\n\s*\n+/);
+    let html = "";
+    for (const para of paragraphs) {
+      const flat = para.replace(/\s+/g, " ").trim();
+      if (!flat) continue;
+      const sentences = flat.split(/(?<=[.!?。！？])\s+/).filter(s => s.length > 0);
+      html += `<p class="passage-paragraph">`;
+      for (const s of sentences) {
+        html += `<span class="passage-sentence" data-sentence="${escAttr(s)}">${renderClickableRun(s)}</span> `;
+      }
+      html += `</p>`;
+    }
+    $out.innerHTML = html;
+  }
+
+  function clearPassage() {
+    const $in = document.getElementById("passage-input");
+    const $out = document.getElementById("passage-output");
+    if ($in) $in.value = "";
+    if ($out) $out.innerHTML = "";
+  }
+
+  // ── passage review (Phase 2): generated passage with target words ─────
+  let passageReviewData = null;     // {passage, targets:[{lexeme,item_id}]}
+  let passageReviewExtras = [];     // per-row state for tapped non-targets
+
+  function passageReview() {
+    state = "passage_review_setup";
+    $card.innerHTML = `
+      <div style="align-self:stretch;text-align:center;">
+        <div style="font-size:22px;margin-bottom:12px;">Passage Review</div>
+        <div style="color:var(--text-dim);font-size:14px;margin-bottom:20px;">
+          Read an LLM-generated passage that embeds your due words.<br>
+          Tap any word you don't recognize.
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+          <label style="color:var(--text-dim);">Target words</label>
+          <input id="pr-n-targets" type="number" min="3" max="10" value="5"
+            style="width:60px;padding:6px;background:var(--card-bg);color:var(--text);
+                   border:1px solid var(--border);border-radius:6px;
+                   font-size:16px;text-align:center;">
+        </div>
+      </div>`;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.startPassageReview()">Generate Passage</button>
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>`;
+  }
+
+  async function startPassageReview() {
+    const $in = document.getElementById("pr-n-targets");
+    const n = $in ? Math.max(3, Math.min(10, parseInt($in.value, 10) || 5)) : 5;
+
+    state = "passage_review_loading";
+    $card.innerHTML = `
+      <div class="spinner"></div>
+      <div class="loading" style="text-align:center;">Generating passage with ${n} due words...</div>`;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>`;
+
+    let data;
+    try {
+      data = await api("POST", "/api/passage-review/generate", { n_targets: n });
+    } catch (e) {
+      $card.innerHTML = `<div class="error-text">Connection error</div>`;
+      $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+      return;
+    }
+    if (!data.ok) {
+      $card.innerHTML = `<div class="error-text">${esc(data.error)}</div>`;
+      $actions.innerHTML = `<div class="btn-row"><button class="btn-secondary" onclick="W.backToStart()">Back</button></div>`;
+      return;
+    }
+    renderPassageReviewActive(data);
+  }
+
+  function renderPassageReviewActive(data) {
+    state = "passage_review_active";
+    passageReviewData = data;
+
+    const passage = data.passage || "";
+    let html = "";
+    const re = /\[\[([^\]|]+)\|([^\]]+)\]\]/g;
+    let last = 0, m;
+    const tapOnclick = 'onclick="W.togglePassageTap(this)"';
+    while ((m = re.exec(passage)) !== null) {
+      html += renderClickableRun(passage.slice(last, m.index),
+                                  { onclickAttr: tapOnclick, trackAdded: false });
+      const surface = m[1], lex = m[2];
+      html += `<span class="clickword" data-target="${escAttr(lex)}" data-word="${escAttr(surface)}" ${tapOnclick}>${esc(surface)}</span>`;
+      last = m.index + m[0].length;
+    }
+    html += renderClickableRun(passage.slice(last),
+                                { onclickAttr: tapOnclick, trackAdded: false });
+
+    const missingNote = (data.missing && data.missing.length > 0)
+      ? `<div style="color:var(--orange);font-size:12px;text-align:center;margin-top:8px;">
+           (LLM omitted: ${data.missing.map(esc).join(", ")})</div>`
+      : "";
+
+    $card.innerHTML = `
+      <div style="align-self:stretch;">
+        <div id="passage-review-note" style="text-align:center;color:var(--text-dim);font-size:14px;margin-bottom:14px;">
+          Read the passage and translate it in your head first. Tap any word you don't recognize.
+        </div>
+        <div class="passage-output" id="passage-review-output">${html}</div>
+        <div id="passage-review-translation"></div>
+        ${missingNote}
+      </div>`;
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.revealPassageTranslation()">Show Translation</button>
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>`;
+  }
+
+  function togglePassageTap(el) {
+    if (el) el.classList.toggle("cw-tapped");
+  }
+
+  // Phase 2: reveal the translation, then allow one more tapping pass before
+  // grading. Taps from phase 1 persist (same DOM), so the final tapped set is
+  // the union of both passes.
+  function revealPassageTranslation() {
+    const $t = document.getElementById("passage-review-translation");
+    if (!$t || $t.dataset.shown) return;
+    $t.dataset.shown = "1";
+    const tr = (passageReviewData && passageReviewData.translation) || "";
+    $t.innerHTML = `
+      <div class="card-divider" style="margin:18px auto;"></div>
+      <div style="color:var(--text-dim);font-size:16px;line-height:1.6;white-space:pre-wrap;word-break:keep-all;">${esc(tr)}</div>`;
+    const note = document.getElementById("passage-review-note");
+    if (note) note.innerHTML = "One more pass — now that you've seen the meaning, tap any word you still didn't actually know, then Submit.";
+    $actions.innerHTML = `
+      <div class="btn-row">
+        <button class="btn-primary" onclick="W.submitPassageReview()">Submit</button>
+        <button class="btn-secondary" onclick="W.backToStart()">Cancel</button>
+      </div>`;
+  }
+
+  async function submitPassageReview() {
+    if (!passageReviewData) return;
+    const $out = document.getElementById("passage-review-output");
+    if (!$out) return;
+
+    // Per-lexeme tap: tapped if any span carrying this lexeme is tapped.
+    const tappedByLex = {};
+    for (const t of passageReviewData.targets) tappedByLex[t.lexeme] = false;
+    $out.querySelectorAll(".clickword[data-target].cw-tapped").forEach(span => {
+      tappedByLex[span.getAttribute("data-target")] = true;
+    });
+
+    // Tapped non-target Korean words → add-word candidates (dedup)
+    const extraSet = new Set();
+    $out.querySelectorAll(".clickword.cw-tapped:not([data-target])").forEach(span => {
+      const w = span.getAttribute("data-word");
+      if (w) extraSet.add(w);
+    });
+    const extras = [...extraSet];
+
+    // Plain-text passage for the context field on each define call
+    const passageContext = (passageReviewData.passage || "")
+      .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$1");
+
+    state = "passage_review_submitting";
+    $card.innerHTML = `<div class="spinner"></div><div class="loading" style="text-align:center;">Grading targets...</div>`;
+    $actions.innerHTML = "";
+
+    let data;
+    try {
+      data = await api("POST", "/api/passage-review/submit", {
+        targets: passageReviewData.targets.map(t => ({
+          lexeme: t.lexeme,
+          item_id: t.item_id,
+          tapped: !!tappedByLex[t.lexeme],
+        })),
+      });
+    } catch (e) {
+      showToast("Submit failed — connection error", "error", 8000);
+      backToStart();
+      return;
+    }
+    if (!data.ok) {
+      showToast("Submit failed: " + (data.error || "unknown"), "error", 8000);
+      backToStart();
+      return;
+    }
+    renderPassageReviewResults(data.target_results || [], extras, passageContext);
+  }
+
+  function renderPassageReviewResults(targetResults, extras, passageContext) {
+    state = "passage_review_results";
+    passageReviewExtras = new Array(extras.length).fill(null);
+
+    const passed = targetResults.filter(t => t.passed);
+    const failed = targetResults.filter(t => !t.passed);
+    const summary = `
+      <div style="text-align:center;">
+        <div style="font-size:18px;margin-bottom:6px;">
+          <span style="color:var(--green);">${passed.length} passed</span>
+          ${failed.length ? `<span style="color:var(--text-dim);"> · </span><span style="color:var(--red);">${failed.length} failed</span>` : ""}
+        </div>
+        <div style="color:var(--text-dim);font-size:13px;">${targetResults.length} target words reviewed</div>
+      </div>
+      <details style="margin-top:12px;">
+        <summary style="cursor:pointer;color:var(--text-dim);font-size:13px;text-align:center;">Target details</summary>
+        <div style="margin-top:8px;font-size:14px;">
+          ${targetResults.map(t => {
+            if (!t.ok) return `<div style="color:var(--text-dim);">- ${esc(t.lexeme)} (${esc(t.error || "skipped")})</div>`;
+            const tag = t.passed
+              ? `<span style="color:var(--green);">✓</span>`
+              : `<span style="color:var(--red);">✗</span>`;
+            const tail = t.passed
+              ? `H ${t.old_H_days}d → ${t.new_H_days}d`
+              : `→ repair`;
+            return `<div>${tag} ${esc(t.lexeme)} — ${tail}</div>`;
+          }).join("")}
+        </div>
+      </details>`;
+
+    let extrasSection = "";
+    if (extras.length > 0) {
+      extrasSection = `
+        <div style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;">
+          <div style="font-size:15px;margin-bottom:8px;">
+            Tapped words to add (${extras.length})
+          </div>
+          <div id="pr-extras-list">
+            ${extras.map((w, i) => `
+              <div class="pr-extra-row" id="pr-extra-${i}"
+                   style="display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+                <input type="checkbox" class="pr-extra-check" disabled style="margin-top:4px;flex:0 0 auto;">
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:600;">${esc(w)}</div>
+                  <div class="pr-extra-def" style="font-size:13px;color:var(--text-dim);margin-top:2px;">Looking up…</div>
+                </div>
+              </div>`).join("")}
+          </div>
+        </div>`;
+    }
+
+    $card.innerHTML = `<div style="align-self:stretch;">${summary}${extrasSection}</div>`;
+    $actions.innerHTML = extras.length > 0
+      ? `<div class="btn-row">
+           <button class="btn-primary" id="pr-commit-btn" onclick="W.commitPassageExtras()" disabled>Add Selected</button>
+           <button class="btn-secondary" onclick="W.backToStart()">Done</button>
+         </div>`
+      : `<div class="btn-row">
+           <button class="btn-secondary" onclick="W.backToStart()">Done</button>
+         </div>`;
+
+    // Progressively define each extra
+    for (let i = 0; i < extras.length; i++) {
+      defineExtraForPassage(i, extras[i], passageContext);
+    }
+  }
+
+  async function defineExtraForPassage(i, surface, context) {
+    const row = document.getElementById(`pr-extra-${i}`);
+    if (!row) return;
+    const $def = row.querySelector(".pr-extra-def");
+    const $check = row.querySelector(".pr-extra-check");
+
+    let data;
+    try {
+      data = await api("POST", "/api/define-word",
+                        { word: surface, context: context });
+    } catch (e) {
+      $def.textContent = "(connection error)";
+      return;
+    }
+
+    if (!data.ok) {
+      $def.textContent = "(" + (data.error || "lookup failed") + ")";
+      passageReviewExtras[i] = { surface: surface, can_add: false };
+      refreshCommitBtn();
+      return;
+    }
+    const senses = data.senses || [];
+    // pick the sense actually used in the passage (contextual), else the first
+    // not-yet-added sense
+    const chosen = senses.find(s => s.slug === data.context_slug && !s.exists)
+                || senses.find(s => !s.exists);
+    if (data.all_exist || !chosen) {
+      $def.innerHTML = `<span style="color:var(--text-dim);">${esc(data.word || surface)} — already in your deck</span>`;
+      passageReviewExtras[i] = { surface: surface, can_add: false };
+      refreshCommitBtn();
+      return;
+    }
+    const hj = (chosen.hanja && chosen.hanja.has_hanja && chosen.hanja.hanja)
+      ? ` <span style="color:var(--text-dim);">${esc(chosen.hanja.hanja)}</span>` : "";
+    $def.innerHTML = `<span style="color:var(--text);">${esc(data.word)}</span>${hj} — ${esc(chosen.definition_en)}`;
+    $check.disabled = false;
+    $check.checked = true;
+    $check.addEventListener("change", refreshCommitBtn);
+    passageReviewExtras[i] = {
+      surface: surface, word: data.word, tagged: !!data.tagged,
+      senses: [{ slug: chosen.slug, definition_en: chosen.definition_en, hanja: chosen.hanja }],
+      can_add: true,
+    };
+    refreshCommitBtn();
+  }
+
+  function refreshCommitBtn() {
+    const $btn = document.getElementById("pr-commit-btn");
+    if (!$btn) return;
+    let anyChecked = false;
+    for (let i = 0; i < passageReviewExtras.length; i++) {
+      const e = passageReviewExtras[i];
+      if (!e || !e.can_add) continue;
+      const row = document.getElementById(`pr-extra-${i}`);
+      if (!row) continue;
+      const $check = row.querySelector(".pr-extra-check");
+      if ($check && $check.checked) { anyChecked = true; break; }
+    }
+    $btn.disabled = !anyChecked;
+  }
+
+  async function commitPassageExtras() {
+    const toAdd = [];
+    for (let i = 0; i < passageReviewExtras.length; i++) {
+      const e = passageReviewExtras[i];
+      if (!e || !e.can_add) continue;
+      const row = document.getElementById(`pr-extra-${i}`);
+      if (!row) continue;
+      const $check = row.querySelector(".pr-extra-check");
+      if ($check && $check.checked) toAdd.push(e);
+    }
+    if (toAdd.length === 0) { backToStart(); return; }
+
+    showToast(`Adding ${toAdd.length} word${toAdd.length === 1 ? "" : "s"}…`, "pending", 3000);
+    for (const e of toAdd) {
+      try {
+        const data = await api("POST", "/api/confirm-add-word",
+                                { word: e.word, senses: e.senses, tagged: e.tagged, hot_add: false });
+        if (data.ok) pollWordGen(data.task_id, e.word);
+        else showToast("Failed: " + e.word + " — " + (data.error || ""), "error", 6000);
+      } catch (err) {
+        showToast("Failed: " + e.word + " — connection error", "error", 6000);
+      }
+    }
+    backToStart();
+  }
+
+  // ── HTML escaping ───────────────────────────────────────
+  function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── expose to onclick handlers ──────────────────────────
+  window.W = {
+    submitIntro: submitIntro,
+    showAnswer: showAnswer,
+    grade: submitGrade,
+    editCard: editCard,
+    deleteVariant: deleteVariant,
+    addVariant: addVariant,
+    startSession: startSession,
+    resumeSession: resumeSession,
+    quarantineWord: quarantineWord,
+    lookupHanja: lookupHanja,
+    addWord: addWord,
+    submitAddWordInput: submitAddWordInput,
+    submitSensePicker: submitSensePicker,
+    confirmAdd: confirmAdd,
+    clickAddWord: clickAddWord,
+    confirmClickAdd: confirmClickAdd,
+    closeClickAdd: closeClickAddModal,
+    extendSense: extendSense,
+    passageMode: passageMode,
+    renderPassage: renderPassage,
+    clearPassage: clearPassage,
+    passageReview: passageReview,
+    startPassageReview: startPassageReview,
+    togglePassageTap: togglePassageTap,
+    revealPassageTranslation: revealPassageTranslation,
+    submitPassageReview: submitPassageReview,
+    commitPassageExtras: commitPassageExtras,
+    addDiffPair: addDiffPair,
+    confirmAddDiffPair: confirmAddDiffPair,
+    manageIntros: manageIntros,
+    saveIntroOrder: saveIntroOrder,
+    spreadHomonyms: spreadHomonyms,
+    introBack: introBack,
+    backToStart: backToStart,
+    adjustParam: adjustParam,
+    addNewWords: addNewWords,
+    activateGrammar: activateGrammar,
+    // grammar
+    startGrammar: startGrammar,
+    grammarSubmitAnswer: grammarSubmitAnswer,
+    grammarGrade: grammarGrade,
+    endGrammar: endGrammar,
+    addPattern: addPattern,
+    confirmAddPattern: confirmAddPattern,
+  };
+
+  // ── boot ────────────────────────────────────────────────
+  renderStartScreen();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Runtime and tooling dependencies for the Korean SRS release.
+# Unpinned for portability; run `pip freeze > requirements.lock` to pin a known
+# working set. Derived from the import closure of release/entrypoints.txt.
+
+# web app
+fastapi
+uvicorn
+pydantic
+
+# LLM content generation
+openai
+
+# storage
+SQLAlchemy
+
+# memory model, calibration, figures
+numpy
+scipy
+matplotlib
+seaborn
+pillow
+
+# prompts / config
+PyYAML

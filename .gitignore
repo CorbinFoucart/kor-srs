@@ -1,0 +1,22 @@
+# secrets and local config
+.env
+project.env
+
+# databases and backups (personal review data)
+*.sqlite
+*.sqlite.*
+*.db
+*.backup
+*.anki2
+*.srt
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.v/
+
+# generated analysis output (regenerate locally; only docs/img is committed)
+/img/
+
+.DS_Store

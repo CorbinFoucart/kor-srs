@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Grammar Config</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --card-bg: #0f3460;
+    --text: #e0e0e0;
+    --text-dim: #888;
+    --accent: #2a69e8;
+    --green: #4caf50;
+    --red: #e74c3c;
+    --orange: #ff9800;
+    --border: #2a2a4a;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overflow-y: auto;
+  }
+
+  #app {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top, 0px) 16px var(--safe-bottom) 16px;
+    min-height: 100%;
+  }
+
+  /* ── header ──────────────────────────────── */
+  .page-header {
+    padding: 16px 0 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .page-title {
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .back-link {
+    color: var(--accent);
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .back-link:hover { text-decoration: underline; }
+
+  /* ── pattern cards (list view) ───────────── */
+  .pattern-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .pattern-card:hover { border-color: var(--accent); }
+
+  .pattern-card-name {
+    font-size: 17px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .pattern-card-meaning {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .pattern-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .qtag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: var(--text-dim);
+  }
+
+  .qtag-active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .qtag-default {
+    border: 1px dashed var(--border);
+    background: transparent;
+    color: var(--text-dim);
+  }
+
+  /* ── detail view ─────────────────────────── */
+  .detail-header {
+    margin-bottom: 20px;
+  }
+
+  .detail-pattern {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .detail-meaning {
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+
+  .qtype-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+
+  .qtype-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .qtype-header input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .qtype-label {
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .qtype-extra {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+
+  .qtype-extra.visible { display: block; }
+
+  .qtype-extra label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .grammar-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 8px;
+  }
+
+  .grammar-input:focus { border-color: var(--accent); }
+
+  select.grammar-input {
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .chip-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .chip {
+    display: inline-block;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    background: var(--card-bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .chip:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ── save bar ────────────────────────────── */
+  .save-bar {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg);
+    padding: 12px 0;
+    padding-bottom: calc(12px + var(--safe-bottom));
+    border-top: 1px solid var(--border);
+    margin-top: 16px;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  button {
+    flex: 1;
+    min-height: 48px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:active {
+    opacity: 0.7;
+    transform: scale(0.97);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    font-size: 14px;
+  }
+
+  /* ── toast ───────────────────────────────── */
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--green);
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .toast.show { opacity: 1; }
+
+  .btn-danger {
+    background: var(--red);
+    color: #fff;
+  }
+
+  .delete-row {
+    margin-top: 8px;
+  }
+
+  .search-bar {
+    margin-bottom: 12px;
+  }
+
+  .loading {
+    color: var(--text-dim);
+    font-size: 16px;
+    text-align: center;
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="content">
+    <div class="loading">Loading patterns...</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function() {
+  "use strict";
+
+  let allPatterns = [];
+  let currentItemId = null;
+
+  const $content = document.getElementById("content");
+  const $toast = document.getElementById("toast");
+
+  const QUESTION_TYPES = [
+    { key: "sentence_completion", label: "Sentence Completion" },
+    { key: "rewrite", label: "Rewrite" },
+    { key: "error_correction", label: "Error Correction" },
+    { key: "context_choice", label: "Context Choice", extra: "related_patterns" },
+    { key: "minimal_pair", label: "Minimal Pair", extra: "partner_pattern" },
+    { key: "evidence_identification", label: "Evidence Identification" },
+    { key: "usage_constraint", label: "Usage Constraint" },
+  ];
+
+  // ── API helper ──────────────────────────────────────────
+  async function api(method, path, body) {
+    const opts = { method, headers: {} };
+    if (body !== undefined) {
+      opts.headers["Content-Type"] = "application/json";
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(path, opts);
+    return res.json();
+  }
+
+  function esc(s) {
+    if (!s) return "";
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function showToast(msg) {
+    $toast.textContent = msg;
+    $toast.classList.add("show");
+    setTimeout(function() { $toast.classList.remove("show"); }, 1500);
+  }
+
+  // ── load patterns ───────────────────────────────────────
+  async function loadPatterns() {
+    try {
+      const data = await api("GET", "/api/grammar/patterns");
+      allPatterns = data.patterns || [];
+      renderList();
+    } catch (e) {
+      $content.innerHTML = '<div class="loading">Connection error. Retrying...</div>';
+      setTimeout(loadPatterns, 2000);
+    }
+  }
+
+  // ── list view ───────────────────────────────────────────
+  function renderList() {
+    let html = `
+      <div class="page-header">
+        <span class="page-title">Grammar Config</span>
+        <a class="back-link" href="/">Home</a>
+      </div>
+      <div class="search-bar">
+        <input class="grammar-input" id="search-input" type="text"
+               placeholder="Search patterns..." oninput="W.filterPatterns()">
+      </div>
+    `;
+
+    if (allPatterns.length === 0) {
+      html += '<div class="loading">No grammar patterns found.</div>';
+      $content.innerHTML = html;
+      return;
+    }
+
+    html += '<div id="pattern-list"></div>';
+    $content.innerHTML = html;
+    renderFilteredList();
+  }
+
+  function filterPatterns() {
+    renderFilteredList();
+  }
+
+  function renderFilteredList() {
+    const $list = document.getElementById("pattern-list");
+    const $search = document.getElementById("search-input");
+    if (!$list) return;
+
+    const query = ($search ? $search.value : "").toLowerCase();
+    const filtered = allPatterns.filter(function(p) {
+      if (!query) return true;
+      return p.pattern.toLowerCase().indexOf(query) !== -1
+          || (p.meaning_en || "").toLowerCase().indexOf(query) !== -1;
+    });
+
+    if (filtered.length === 0) {
+      $list.innerHTML = '<div class="loading">No matches.</div>';
+      return;
+    }
+
+    let html = "";
+    for (let i = 0; i < filtered.length; i++) {
+      const p = filtered[i];
+      const qtypes = p.question_types || [];
+
+      let tagsHtml = "";
+      if (qtypes.length === 0) {
+        tagsHtml = '<span class="qtag qtag-default">default</span>';
+      } else {
+        for (let j = 0; j < qtypes.length; j++) {
+          const t = qtypes[j].type || "unknown";
+          const label = t.replace(/_/g, " ");
+          tagsHtml += '<span class="qtag qtag-active">' + esc(label) + '</span>';
+        }
+      }
+
+      html += `
+        <div class="pattern-card" onclick="W.openDetail(${p.item_id})">
+          <div class="pattern-card-name">${esc(p.pattern)}</div>
+          <div class="pattern-card-meaning">${esc(p.meaning_en)}</div>
+          <div class="pattern-tags">${tagsHtml}</div>
+        </div>
+      `;
+    }
+
+    $list.innerHTML = html;
+  }
+
+  // ── detail view ─────────────────────────────────────────
+  function openDetail(itemId) {
+    currentItemId = itemId;
+    renderDetail();
+  }
+
+  function renderDetail() {
+    const p = allPatterns.find(function(x) { return x.item_id === currentItemId; });
+    if (!p) { renderList(); return; }
+
+    const existing = p.question_types || [];
+    const existingByType = {};
+    for (let i = 0; i < existing.length; i++) {
+      existingByType[existing[i].type] = existing[i];
+    }
+
+    // gather other pattern names for chips/dropdown
+    const otherPatterns = allPatterns
+      .filter(function(x) { return x.item_id !== currentItemId; })
+      .map(function(x) { return x.pattern; });
+
+    let html = `
+      <div class="page-header">
+        <a class="back-link" onclick="W.backToList()">← Back</a>
+      </div>
+      <div class="detail-header">
+        <div class="detail-pattern">${esc(p.pattern)}</div>
+        <div class="detail-meaning">${esc(p.meaning_en)}</div>
+      </div>
+    `;
+
+    for (let i = 0; i < QUESTION_TYPES.length; i++) {
+      const qt = QUESTION_TYPES[i];
+      const isChecked = existingByType.hasOwnProperty(qt.key);
+      const cfg = existingByType[qt.key] || {};
+
+      html += `
+        <div class="qtype-row">
+          <div class="qtype-header">
+            <input type="checkbox" id="cb-${qt.key}" ${isChecked ? "checked" : ""}
+                   onchange="W.toggleExtra('${qt.key}')">
+            <label class="qtype-label" for="cb-${qt.key}">${esc(qt.label)}</label>
+          </div>
+      `;
+
+      if (qt.extra === "related_patterns") {
+        const related = (cfg.related_patterns || []).join(", ");
+        html += `
+          <div class="qtype-extra ${isChecked ? "visible" : ""}" id="extra-${qt.key}">
+            <label>Related patterns (comma-separated)</label>
+            <input class="grammar-input" id="input-related" type="text"
+                   value="${esc(related)}" placeholder="e.g. -아/어서, -(으)니까">
+            <div class="chip-container">
+        `;
+        for (let j = 0; j < otherPatterns.length; j++) {
+          html += `<span class="chip" onclick="W.addRelated('${esc(otherPatterns[j])}')">${esc(otherPatterns[j])}</span>`;
+        }
+        html += '</div></div>';
+      } else if (qt.extra === "partner_pattern") {
+        const partner = cfg.partner_pattern || "";
+        html += `
+          <div class="qtype-extra ${isChecked ? "visible" : ""}" id="extra-${qt.key}">
+            <label>Partner pattern</label>
+            <select class="grammar-input" id="input-partner">
+              <option value="">-- Select --</option>
+        `;
+        for (let j = 0; j < otherPatterns.length; j++) {
+          const sel = otherPatterns[j] === partner ? "selected" : "";
+          html += `<option value="${esc(otherPatterns[j])}" ${sel}>${esc(otherPatterns[j])}</option>`;
+        }
+        html += '</select></div>';
+      }
+
+      html += '</div>';
+    }
+
+    html += `
+      <div class="save-bar">
+        <div class="btn-row">
+          <button class="btn-primary" onclick="W.saveConfig()">Save</button>
+          <button class="btn-secondary" onclick="W.backToList()">Cancel</button>
+        </div>
+        <div class="btn-row delete-row">
+          <button class="btn-danger" onclick="W.deletePattern()">Delete Pattern</button>
+        </div>
+      </div>
+    `;
+
+    $content.innerHTML = html;
+  }
+
+  function toggleExtra(key) {
+    const cb = document.getElementById("cb-" + key);
+    const extra = document.getElementById("extra-" + key);
+    if (!extra) return;
+    if (cb && cb.checked) {
+      extra.classList.add("visible");
+    } else {
+      extra.classList.remove("visible");
+    }
+  }
+
+  function addRelated(pattern) {
+    const $input = document.getElementById("input-related");
+    if (!$input) return;
+    const current = $input.value.trim();
+    const parts = current ? current.split(/\s*,\s*/).filter(Boolean) : [];
+    if (parts.indexOf(pattern) === -1) {
+      parts.push(pattern);
+      $input.value = parts.join(", ");
+    }
+  }
+
+  function buildQuestionTypes() {
+    const result = [];
+    for (let i = 0; i < QUESTION_TYPES.length; i++) {
+      const qt = QUESTION_TYPES[i];
+      const cb = document.getElementById("cb-" + qt.key);
+      if (!cb || !cb.checked) continue;
+
+      const entry = { type: qt.key };
+
+      if (qt.extra === "related_patterns") {
+        const $input = document.getElementById("input-related");
+        if ($input && $input.value.trim()) {
+          entry.related_patterns = $input.value.split(/\s*,\s*/).filter(Boolean);
+        } else {
+          entry.related_patterns = [];
+        }
+      } else if (qt.extra === "partner_pattern") {
+        const $sel = document.getElementById("input-partner");
+        if ($sel) {
+          entry.partner_pattern = $sel.value;
+        }
+      }
+
+      result.push(entry);
+    }
+    return result;
+  }
+
+  async function saveConfig() {
+    const qtypes = buildQuestionTypes();
+    try {
+      const data = await api("POST", "/api/grammar/set-question-types", {
+        item_id: currentItemId,
+        question_types: qtypes,
+      });
+      if (data.ok) {
+        showToast("Saved");
+        await loadPatterns();
+        backToList();
+      } else {
+        showToast("Error: " + (data.error || "unknown"));
+      }
+    } catch (e) {
+      showToast("Connection error");
+    }
+  }
+
+  function backToList() {
+    currentItemId = null;
+    renderList();
+  }
+
+  async function deletePattern() {
+    const p = allPatterns.find(function(x) { return x.item_id === currentItemId; });
+    if (!p) return;
+    if (!confirm("Delete pattern " + p.pattern + "? This cannot be undone.")) return;
+    try {
+      const data = await api("POST", "/api/grammar/delete-pattern", { item_id: currentItemId });
+      if (data.ok) {
+        showToast("Pattern deleted");
+        await loadPatterns();
+        backToList();
+      } else {
+        showToast("Error: " + (data.error || "unknown"));
+      }
+    } catch (e) {
+      showToast("Connection error");
+    }
+  }
+
+  // ── expose to onclick handlers ──────────────────────────
+  window.W = {
+    openDetail: openDetail,
+    backToList: backToList,
+    toggleExtra: toggleExtra,
+    addRelated: addRelated,
+    saveConfig: saveConfig,
+    deletePattern: deletePattern,
+    filterPatterns: filterPatterns,
+  };
+
+  // ── boot ────────────────────────────────────────────────
+  loadPatterns();
+})();
+</script>
+</body>
+</html>
