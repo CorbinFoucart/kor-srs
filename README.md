@@ -19,10 +19,10 @@ Hanja, and multi-word reading passages) is generated on demand by an LLM.
 
 ## Features
 
-Anki is great, but building cards that put each vocabulary word in a natural
-sentence, with a translation and a Hanja breakdown, is slow to do by hand.
-Korean SRS generates that context for you and schedules it, with card creation
-built specifically for Korean.
+**First, why not Anki?** Anki is great, but building cards that put each
+vocabulary word in a natural sentence, with a translation and a Hanja breakdown,
+is slow to do by hand. Korean SRS generates that context for you and schedules
+it, with card creation built specifically for Korean.
 
 <p align="center">
   <img src="docs/img/screen-start.png"   width="30%" alt="Start screen" />
@@ -196,12 +196,14 @@ source .env
 # seed a deck. Generates example cards with the LLM (a handful of API calls,
 # about a minute). With no --words it uses a small built-in starter list; pass
 # --words to choose your own.
-python seed_static_cards.py --db mydeck.sqlite
-# python seed_static_cards.py --db mydeck.sqlite --words 먹다 자다 가다
+python src/seed_static_cards.py --db mydeck.sqlite
+# python src/seed_static_cards.py --db mydeck.sqlite --words 먹다 자다 가다
 
 # start the web server, then open http://localhost:8000
-python web_server.py --db mydeck.sqlite --target-new 5 --queue-size 3 --intro-examples 2
+python src/web_server.py --db mydeck.sqlite --target-new 5 --queue-size 3 --intro-examples 2
 ```
+
+The Python source lives in `src/`; run scripts as `python src/<name>.py`.
 
 What to expect on the first session: each new word is shown as a couple of intro
 cards, then its first real review is scheduled about a day out. So once the
@@ -216,15 +218,15 @@ More commands (point `--db` at your own deck):
 
 ```bash
 # terminal review session instead of the web UI
-python review_cli.py --db mydeck.sqlite --target-new 5 --queue-size 3 --intro-examples 2
+python src/review_cli.py --db mydeck.sqlite --target-new 5 --queue-size 3 --intro-examples 2
 
 # calibrate the model against your review history (recognition only)
-python calibrate_model.py --db mydeck.sqlite --recognition-only --save
+python src/calibrate_model.py --db mydeck.sqlite --recognition-only --save
 
 # analysis and diagnostics
-python daily_analysis.py --db mydeck.sqlite
-python print_db.py --db mydeck.sqlite
-python print_reviews.py --db mydeck.sqlite
+python src/daily_analysis.py --db mydeck.sqlite
+python src/print_db.py --db mydeck.sqlite
+python src/print_reviews.py --db mydeck.sqlite
 ```
 
 ## Controls

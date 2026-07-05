@@ -13,6 +13,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: import smoke test
+        working-directory: src
         env:
           OPENAI_API_KEY: dummy   # value unused; import-time OpenAI() needs it set
         run: |
