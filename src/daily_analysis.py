@@ -30,6 +30,7 @@ from incremental_model import (
 from acquisition_model import (
     LexemeState,
     lexeme_state_from_dict,
+    compute_due_at,
     GRADUATION_H,
     PHASE_DAY0,
     PHASE_ACQUIRING,
@@ -161,12 +162,16 @@ def _load_current_states(session: Session) -> dict[str, dict]:
                        "reviewed": bool, "passes_24h": int, "is_hard": bool,
                        "skill_data": ... (legacy compat)}}
     """
+    # Load every active card item, not just production bundles: recognition-only
+    # split senses (e.g. 분기#quarter) carry their LexemeState on the recog item
+    # and have no prod bundle, so a prod-only query silently drops them.
+    now = srs_db.now_utc()
     items = (
         session.execute(
             select(srs_db.Item)
             .where(srs_db.Item.suspended == False)
             .where(srs_db.Item.deleted_at.is_(None))
-            .where(srs_db.Item.external_id.like("%cloze_prod_bundle%"))
+            .where(srs_db.Item.item_type == "card")
         )
         .scalars()
         .all()
@@ -174,19 +179,22 @@ def _load_current_states(session: Session) -> dict[str, dict]:
     states = {}
     for item in items:
         lexeme = srs_db.extract_lexeme_from_external_id(item.external_id)
-        if not lexeme:
+        if not lexeme or lexeme in states:
             continue
         if not item.srs_state or not item.srs_state.state:
             continue
         state = item.srs_state.state
-        due = _ensure_utc(item.srs_state.due_at) if item.srs_state.due_at else None
         reviewed = item.srs_state.last_reviewed_at is not None
 
-        # Try new format first (has "lexeme_state" key or "phase" key)
+        # New format: per-lexeme state lives on the canonical item (prod bundle,
+        # or recog bundle for recog-only split senses). Recompute due from the
+        # live half-life instead of a persisted due_at that recognition reviews
+        # may not have refreshed.
         lexeme_state_data = state.get("lexeme_state")
         if lexeme_state_data and "phase" in lexeme_state_data:
             ls = lexeme_state_from_dict(lexeme_state_data)
             phase = ls.phase
+            due = compute_due_at(ls, now) if reviewed else None
             if phase == PHASE_MAINTENANCE:
                 active_H = ls.half_life_secs
                 active_skill = "production"
@@ -205,7 +213,7 @@ def _load_current_states(session: Session) -> dict[str, dict]:
             }
             continue
 
-        # Fall back to old multi-skill format
+        # Fall back to old multi-skill format (legacy words: use persisted due).
         skill_data = state.get("skill_states")
         if not skill_data:
             continue
@@ -214,7 +222,7 @@ def _load_current_states(session: Session) -> dict[str, dict]:
             "skill_data": skill_data,
             "active_skill": _active_skill(skill_data),
             "active_H": _active_H(skill_data),
-            "due_at": due,
+            "due_at": _ensure_utc(item.srs_state.due_at) if item.srs_state.due_at else None,
             "reviewed": reviewed,
             "passes_24h": 0,
             "is_hard": False,
