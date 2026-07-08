@@ -151,7 +151,7 @@ def main() -> None:
         ax1.set_xlim(bins[0], bins[-1]); ax1.set_ylim(0, ymax)
         ax1.set_xticks(np.arange(0, 91, 20))                               # uniform gridlines
         ax1.set_xlabel("days until due  (←overdue | future→)"); ax1.set_ylabel("density")
-        ax1.set_title(f"Cards due by time — {days[k].date()}", fontsize=12)
+        ax1.set_title(f"Cards due by time · {days[k].date()}", fontsize=12)
         ax1.set_box_aspect(1)                                              # square panel
         sns.despine(ax=ax1)
         ax1.text(0.98, 0.96, f"total: {total_by[k]}\nacquired: {acquired_by[k]}",
