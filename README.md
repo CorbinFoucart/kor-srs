@@ -37,7 +37,7 @@ it, with card creation built specifically for Korean.
   with the target word highlighted. Reveal, then grade your recall.
 - **Adaptive half-life scheduling.** An exponential forgetting model with a
   per-word, self-calibrating half-life (see [Memory model](#memory-model)). Intervals stretch
-  as a word matures and are capped at about 90 days.
+  as a word matures and are capped at about 180 days.
 - **On-demand Hanja breakdowns.** Tap to see the Sino-Korean characters, their
   readings and meanings, and high-frequency example words. Native words (고유어)
   and loanwords are reported as having no Hanja, and readings are validated
@@ -134,10 +134,10 @@ The next interval comes from a target recall probability:
 Δt = -H · log₂(p*)          p* = 0.80  (recognition target recall)
 ```
 
-Half-lives are clamped so the scheduled interval never exceeds about **90 days**
+Half-lives are clamped so the scheduled interval never exceeds about **180 days**
 (`MAX_SCHED_HALF_LIFE`). A separate `MAX_HALF_LIFE` (the `H` giving a 1-year
-interval) marks full retirement ("learned"). With the 90-day scheduling cap in
-place, words settle into a quarterly cadence instead of retiring.
+interval) marks full retirement ("learned"). With the 180-day scheduling cap in
+place, words settle into a twice-a-year cadence instead of retiring.
 
 ### Calibration
 
@@ -268,7 +268,7 @@ Pure model logic lives in `acquisition_model.py` (phases + repair) and
 | `GRADE_WEIGHT` | `{1:3.0, 2:2.0, 3:1.5, 4:0.05, 5:0.10, 6:1.0}` | Per-grade fluency weights |
 | `ETA_BASE` / `ETA_BOOST` | 0.50 / 5.0 | Learning-rate asymptote / small-H boost |
 | `H_SCALE` | 3,000 s | η transition scale |
-| `MAX_SCHED_HALF_LIFE` | ~90-day interval | Scheduling clamp on `H` |
+| `MAX_SCHED_HALF_LIFE` | ~180-day interval | Scheduling clamp on `H` |
 | `MAX_HALF_LIFE` | ~1-year interval | Retirement ("learned") threshold |
 | `MAX_ODDS` | 5.0 | Odds-ratio clamp on wrong reviews |
 | `MIN_HALF_LIFE` | 5 s | `H` floor |

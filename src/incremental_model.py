@@ -47,13 +47,13 @@ _LEARNED_INTERVAL_SECS = 365.0 * 86400.0  # 1 year
 MAX_HALF_LIFE = _LEARNED_INTERVAL_SECS / (-math.log2(TARGET_RECALL["production"]))
 
 # MAX_SCHED_HALF_LIFE: the H clamp applied on every update — caps the scheduled
-# review interval at ~90 days. Recognition recall stays high far past the model's
-# prediction, and we only have ~1 month of recognition data, so we cap intervals
-# here rather than extrapolate to year-long gaps. Because this clamp (≈280d) sits
-# below MAX_HALF_LIFE (≈1133d), capped words never reach the retirement threshold
-# — they keep getting reviewed ~quarterly instead of being retired. Raise the
-# 90-day figure once longer-horizon recognition retention data exists.
-_MAX_SCHED_INTERVAL_SECS = 90.0 * 86400.0  # 90 days
+# review interval at ~180 days (half a year). Recognition recall stays high far
+# past the model's prediction, so we cap intervals here rather than extrapolate
+# to year-long gaps. Because this clamp (≈560d) sits below MAX_HALF_LIFE
+# (≈1133d), capped words never reach the retirement threshold — they keep getting
+# reviewed twice a year instead of being retired. Raised from 90 to 180 days
+# (2026-08) now that several months of recognition retention data exist.
+_MAX_SCHED_INTERVAL_SECS = 180.0 * 86400.0  # 180 days (half a year)
 MAX_SCHED_HALF_LIFE = _MAX_SCHED_INTERVAL_SECS / (-math.log2(TARGET_RECALL["recognition"]))
 MAX_ODDS = 5.0                      # clamp on p̂/(1-p̂); recognition-calibrated (gentle wrongs)
 
